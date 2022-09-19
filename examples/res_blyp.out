@@ -1,0 +1,515 @@
+
+  Memory set to   1.863 GiB by Python driver.
+    Molecular point group: c1
+    Full point group: C1
+
+    Geometry (in Angstrom), charge = -1, multiplicity = 1:
+
+       Center              X                  Y                   Z               Mass       
+    ------------   -----------------  -----------------  -----------------  -----------------
+         F           -0.557000000000    -0.111000000000     0.211000000000    18.998403162730
+         O           -3.247000000000    -0.309000000000     0.510000000000    15.994914619570
+         H           -2.292000000000    -0.162000000000     0.596000000000     1.007825032230
+         H           -3.423000000000    -0.373000000000    -0.441000000000     1.007825032230
+         O            0.270000000000     0.639000000000     2.466000000000    15.994914619570
+         H            0.917000000000     0.920000000000     1.800000000000     1.007825032230
+         H           -0.454000000000     0.221000000000     1.975000000000     1.007825032230
+         O            1.945000000000     0.469000000000    -0.891000000000    15.994914619570
+         H            1.757000000000     1.381000000000    -1.162000000000     1.007825032230
+         H            1.113000000000     0.119000000000    -0.536000000000     1.007825032230
+         O            0.110000000000    -1.876000000000    -1.842000000000    15.994914619570
+         H            0.168000000000    -1.107000000000    -2.430000000000     1.007825032230
+         H           -0.158000000000    -1.530000000000    -0.976000000000     1.007825032230
+         O           -1.871000000000     2.518000000000    -0.626000000000    15.994914619570
+         H           -1.539000000000     1.607000000000    -0.661000000000     1.007825032230
+         H           -1.385000000000     2.953000000000     0.091000000000     1.007825032230
+         O           -0.116000000000    -2.762000000000     1.382000000000    15.994914619570
+         H           -0.906000000000    -2.256000000000     1.137000000000     1.007825032230
+         H            0.642000000000    -2.220000000000     1.112000000000     1.007825032230
+         O           -2.971000000000    -0.233000000000    -2.546000000000    15.994914619570
+         H           -2.364000000000    -0.797000000000    -3.050000000000     1.007825032230
+         H           -2.688000000000     0.680000000000    -2.713000000000     1.007825032230
+         O           -3.765000000000     0.578000000000     3.209000000000    15.994914619570
+         H           -3.610000000000     0.515000000000     2.253000000000     1.007825032230
+         H           -3.870000000000    -0.334000000000     3.523000000000     1.007825032230
+
+  Threads set to 1 by Python driver.
+
+Scratch directory: /tmp/
+
+*** tstart() called on mpcmtmds.univ-lille1.fr
+*** at Mon Sep 19 16:44:34 2022
+
+   => Loading Basis Set <=
+
+    Name: ANONYMOUS775
+    Role: ORBITAL
+    Keyword: BASIS
+    atoms 1                                                 entry F          line   377 file /Users/matteo/opt/anaconda3/envs/p4env/share/psi4/basis/aug-cc-pvtz.gbs 
+    atoms 2, 5, 8, 11, 14, 17, 20, 23                       entry O          line    81 file /Users/matteo/opt/anaconda3/envs/p4env/share/psi4/basis/sto-3g.gbs 
+    atoms 3-4, 6-7, 9-10, 12-13, 15-16, 18-19, 21-22, 24-25 entry H          line    19 file /Users/matteo/opt/anaconda3/envs/p4env/share/psi4/basis/sto-3g.gbs 
+
+
+         ---------------------------------------------------------
+                                   SCF
+               by Justin Turney, Rob Parrish, Andy Simmonett
+                          and Daniel G. A. Smith
+                              RKS Reference
+                        1 Threads,   1907 MiB Core
+         ---------------------------------------------------------
+
+  ==> Geometry <==
+
+    Molecular point group: c1
+    Full point group: C1
+
+    Geometry (in Angstrom), charge = -1, multiplicity = 1:
+
+       Center              X                  Y                   Z               Mass       
+    ------------   -----------------  -----------------  -----------------  -----------------
+         F           -0.557000000000    -0.111000000000     0.211000000000    18.998403162730
+         O           -3.247000000000    -0.309000000000     0.510000000000    15.994914619570
+         H           -2.292000000000    -0.162000000000     0.596000000000     1.007825032230
+         H           -3.423000000000    -0.373000000000    -0.441000000000     1.007825032230
+         O            0.270000000000     0.639000000000     2.466000000000    15.994914619570
+         H            0.917000000000     0.920000000000     1.800000000000     1.007825032230
+         H           -0.454000000000     0.221000000000     1.975000000000     1.007825032230
+         O            1.945000000000     0.469000000000    -0.891000000000    15.994914619570
+         H            1.757000000000     1.381000000000    -1.162000000000     1.007825032230
+         H            1.113000000000     0.119000000000    -0.536000000000     1.007825032230
+         O            0.110000000000    -1.876000000000    -1.842000000000    15.994914619570
+         H            0.168000000000    -1.107000000000    -2.430000000000     1.007825032230
+         H           -0.158000000000    -1.530000000000    -0.976000000000     1.007825032230
+         O           -1.871000000000     2.518000000000    -0.626000000000    15.994914619570
+         H           -1.539000000000     1.607000000000    -0.661000000000     1.007825032230
+         H           -1.385000000000     2.953000000000     0.091000000000     1.007825032230
+         O           -0.116000000000    -2.762000000000     1.382000000000    15.994914619570
+         H           -0.906000000000    -2.256000000000     1.137000000000     1.007825032230
+         H            0.642000000000    -2.220000000000     1.112000000000     1.007825032230
+         O           -2.971000000000    -0.233000000000    -2.546000000000    15.994914619570
+         H           -2.364000000000    -0.797000000000    -3.050000000000     1.007825032230
+         H           -2.688000000000     0.680000000000    -2.713000000000     1.007825032230
+         O           -3.765000000000     0.578000000000     3.209000000000    15.994914619570
+         H           -3.610000000000     0.515000000000     2.253000000000     1.007825032230
+         H           -3.870000000000    -0.334000000000     3.523000000000     1.007825032230
+
+  Running in c1 symmetry.
+
+  Rotational constants: A =      0.02122  B =      0.01521  C =      0.01329 [cm^-1]
+  Rotational constants: A =    636.29565  B =    456.02538  C =    398.52801 [MHz]
+  Nuclear repulsion =  555.863567019070842
+
+  Charge       = -1
+  Multiplicity = 1
+  Electrons    = 90
+  Nalpha       = 45
+  Nbeta        = 45
+
+  ==> Algorithm <==
+
+  SCF Algorithm Type is DIRECT.
+  DIIS enabled.
+  MOM disabled.
+  Fractional occupation disabled.
+  Guess Type is SAD.
+  Energy threshold   = 1.00e-08
+  Density threshold  = 1.00e-08
+  Integral threshold = 1.00e-12
+
+  ==> Primary Basis <==
+
+  Basis Set: ANONYMOUS775
+    Blend: AUG-CC-PVTZ + STO-3G
+    Number of shells: 54
+    Number of basis functions: 102
+    Number of Cartesian functions: 111
+    Spherical Harmonics?: true
+    Max angular momentum: 3
+
+  ==> DFT Potential <==
+
+   => Composite Functional: BLYP <= 
+
+    BLYP GGA Exchange-Correlation Functional
+
+    P.J. Stephens et. al., J. Phys. Chem., 98, 11623-11627, 1994
+    B. Miehlich et. al., Chem. Phys. Lett., 157(3), 200-206 1989
+
+
+    Deriv               =              1
+    GGA                 =           TRUE
+    Meta                =          FALSE
+
+    Exchange Hybrid     =          FALSE
+    MP2 Hybrid          =          FALSE
+
+   => Exchange Functionals <=
+
+    1.0000     XC_GGA_X_B88
+
+   => Correlation Functionals <=
+
+    1.0000     XC_GGA_C_LYP
+
+   => LibXC Density Thresholds  <==
+
+    XC_GGA_C_LYP:  1.00E-14 
+    XC_GGA_X_B88:  1.00E-15 
+
+   => Molecular Quadrature <=
+
+    Radial Scheme          =          BECKE
+    Pruning Scheme         =           NONE
+    Nuclear Scheme         =       TREUTLER
+
+    BS radius alpha        =              1
+    Pruning alpha          =              1
+    Radial Points          =             75
+    Spherical Points       =            434
+    Total Points           =         682251
+    Total Blocks           =           4724
+    Max Points             =            256
+    Max Functions          =             95
+    Weights Tolerance      =       1.00E-15
+
+  ==> Integral Setup <==
+
+  ==> DirectJK: Integral-Direct J/K Matrices <==
+
+    J tasked:                  Yes
+    K tasked:                   No
+    wK tasked:                  No
+    Integrals threads:           1
+    Schwarz Cutoff:          1E-12
+
+  Cached 100.0% of DFT collocation blocks in 1.292 [GiB].
+
+  Minimum eigenvalue in the overlap matrix is 2.3892298310E-02.
+  Reciprocal condition number of the overlap matrix is 7.7971245504E-03.
+    Using symmetric orthogonalization.
+
+  ==> Pre-Iterations <==
+
+  SCF Guess: Superposition of Atomic Densities via on-the-fly atomic UHF (no occupation information).
+
+   -------------------------
+    Irrep   Nso     Nmo    
+   -------------------------
+     A        102     102 
+   -------------------------
+    Total     102     102
+   -------------------------
+
+  ==> Iterations <==
+
+                        Total Energy        Delta E     RMS |[F,P]|
+
+   @RKS iter SAD:  -699.02430590451036   -6.99024e+02   0.00000e+00 
+   @RKS iter   1:  -702.07574947618764   -3.05144e+00   8.15978e-03 DIIS
+   @RKS iter   2:  -699.70387722854298    2.37187e+00   2.55013e-02 DIIS
+   @RKS iter   3:  -702.25317054964341   -2.54929e+00   3.87097e-03 DIIS
+   @RKS iter   4:  -702.33783918169138   -8.46686e-02   1.57991e-03 DIIS
+   @RKS iter   5:  -702.35135676025209   -1.35176e-02   3.28308e-04 DIIS
+   @RKS iter   6:  -702.35174691888517   -3.90159e-04   1.43152e-04 DIIS
+   @RKS iter   7:  -702.35185264254710   -1.05724e-04   2.70096e-05 DIIS
+   @RKS iter   8:  -702.35185588429226   -3.24175e-06   9.45452e-06 DIIS
+   @RKS iter   9:  -702.35185631581453   -4.31522e-07   1.49802e-06 DIIS
+   @RKS iter  10:  -702.35185632695254   -1.11380e-08   4.16431e-07 DIIS
+   @RKS iter  11:  -702.35185632772993   -7.77391e-10   1.09814e-07 DIIS
+   @RKS iter  12:  -702.35185632777598   -4.60432e-11   1.39960e-08 DIIS
+   @RKS iter  13:  -702.35185632777802   -2.04636e-12   3.91083e-09 DIIS
+  Energy and wave function converged.
+
+
+  ==> Post-Iterations <==
+
+   Electrons on quadrature grid:
+      Ntotal   =   90.0000281808 ; deviation = 2.818e-05 
+
+    Orbital Energies [Eh]
+    ---------------------
+
+    Doubly Occupied:                                                      
+
+       1A    -23.938505     2A    -18.424114     3A    -18.343784  
+       4A    -18.343426     5A    -18.332127     6A    -18.331703  
+       7A    -18.326147     8A    -18.324930     9A    -18.323286  
+      10A     -0.749994    11A     -0.719096    12A     -0.685268  
+      13A     -0.680005    14A     -0.677671    15A     -0.675599  
+      16A     -0.670580    17A     -0.661740    18A     -0.653626  
+      19A     -0.298758    20A     -0.239833    21A     -0.238215  
+      22A     -0.233211    23A     -0.228958    24A     -0.224467  
+      25A     -0.215230    26A     -0.209108    27A     -0.086223  
+      28A     -0.065017    29A     -0.062605    30A     -0.060684  
+      31A     -0.030946    32A     -0.022839    33A     -0.010294  
+      34A     -0.007877    35A     -0.000383    36A      0.003953  
+      37A      0.017265    38A      0.024410    39A      0.064963  
+      40A      0.070537    41A      0.076075    42A      0.076818  
+      43A      0.077489    44A      0.081805    45A      0.087204  
+
+    Virtual:                                                              
+
+      46A      0.267844    47A      0.281940    48A      0.296845  
+      49A      0.301407    50A      0.402822    51A      0.453305  
+      52A      0.476451    53A      0.488646    54A      0.504540  
+      55A      0.522339    56A      0.532112    57A      0.549284  
+      58A      0.558516    59A      0.572579    60A      0.595758  
+      61A      0.610820    62A      0.654093    63A      0.683815  
+      64A      0.768053    65A      0.819988    66A      0.935147  
+      67A      0.977195    68A      1.045518    69A      1.123503  
+      70A      1.202044    71A      1.225380    72A      1.330799  
+      73A      1.380812    74A      1.694402    75A      2.757326  
+      76A      2.759639    77A      2.781179    78A      2.804618  
+      79A      2.806258    80A      2.814842    81A      2.827306  
+      82A      2.834927    83A      2.865817    84A      2.918670  
+      85A      2.925348    86A      3.005925    87A      4.868788  
+      88A      4.890309    89A      4.931652    90A      8.457065  
+      91A      8.460446    92A      8.465316    93A      8.465972  
+      94A      8.473758    95A      8.488589    96A      8.514244  
+      97A      8.861297    98A      8.864016    99A      8.891358  
+     100A      8.921588   101A      8.989794   102A     10.151008  
+
+    Final Occupation by Irrep:
+              A 
+    DOCC [    45 ]
+
+  @RKS Final Energy:  -702.35185632777802
+
+   => Energetics <=
+
+    Nuclear Repulsion Energy =            555.8635670190708424
+    One-Electron Energy =               -2097.8182675176240082
+    Two-Electron Energy =                 925.4596618270714998
+    DFT Exchange-Correlation Energy =     -85.8568176562964140
+    Empirical Dispersion Energy =           0.0000000000000000
+    VV10 Nonlocal Energy =                  0.0000000000000000
+    Total Energy =                       -702.3518563277780231
+
+Computation Completed
+
+
+Properties will be evaluated at   0.000000,   0.000000,   0.000000 [a0]
+
+Properties computed using the SCF density matrix
+
+  Nuclear Dipole Moment: [e a0]
+     X:  -189.4734      Y:   -17.3666      Z:    29.6933
+
+  Electronic Dipole Moment: [e a0]
+     X:   191.0740      Y:    18.1079      Z:   -31.8261
+
+  Dipole Moment: [e a0]
+     X:     1.6006      Y:     0.7413      Z:    -2.1328     Total:     2.7677
+
+  Dipole Moment: [D]
+     X:     4.0684      Y:     1.8842      Z:    -5.4210     Total:     7.0349
+
+
+*** tstop() called on mpcmtmds.univ-lille1.fr at Mon Sep 19 16:45:52 2022
+Module time:
+	user time   =      74.81 seconds =       1.25 minutes
+	system time =       1.17 seconds =       0.02 minutes
+	total time  =         78 seconds =       1.30 minutes
+Total time:
+	user time   =      74.81 seconds =       1.25 minutes
+	system time =       1.17 seconds =       0.02 minutes
+	total time  =         78 seconds =       1.30 minutes
+   => Loading Basis Set <=
+
+    Name: AUG-CC-PVTZ
+    Role: ORBITAL
+    Keyword: BASIS
+    atoms 1 entry F          line   377 file /Users/matteo/opt/anaconda3/envs/p4env/share/psi4/basis/aug-cc-pvtz.gbs 
+
+  ==> DirectJK: Integral-Direct J/K Matrices <==
+
+    J tasked:                  Yes
+    K tasked:                  Yes
+    wK tasked:                  No
+    Integrals threads:           1
+    Schwarz Cutoff:          1E-12
+
+High Level functional : blyp
+
+Low Level functional : blyp
+
+Low Level basis : sto-3g
+
+High Level basis : aug-cc-pvtz
+
+F1   -0.55700   -0.11100   0.21100
+-1 1
+    O       -3.24700       -0.30900        0.51000
+    H       -2.29200       -0.16200        0.59600
+    H       -3.42300       -0.37300       -0.44100
+    O        0.27000        0.63900        2.46600
+    H        0.91700        0.92000        1.80000
+    H       -0.45400        0.22100        1.97500
+    O        1.94500        0.46900       -0.89100
+    H        1.75700        1.38100       -1.16200
+    H        1.11300        0.11900       -0.53600
+    O        0.11000       -1.87600       -1.84200
+    H        0.16800       -1.10700       -2.43000
+    H       -0.15800       -1.53000       -0.97600
+    O       -1.87100        2.51800       -0.62600
+    H       -1.53900        1.60700       -0.66100
+    H       -1.38500        2.95300        0.09100
+    O       -0.11600       -2.76200        1.38200
+    H       -0.90600       -2.25600        1.13700
+    H        0.64200       -2.22000        1.11200
+    O       -2.97100       -0.23300       -2.54600
+    H       -2.36400       -0.79700       -3.05000
+    H       -2.68800        0.68000       -2.71300
+    O       -3.76500        0.57800        3.20900
+    H       -3.61000        0.51500        2.25300
+    H       -3.87000       -0.33400        3.52300
+symmetry c1
+no_reorient
+no_com
+centers of high level subsys: 1
+Number of shells of the total AB basis:  54
+Number of functions of the total AB basis:  102
+functions in subsys1: 46
+Overlap_AA in BO is Overlap_AA in AO: True
+Overlap_AB in BO is zero: True
+
+Size of the ERI tensor would be 0.87 GB.
+using EX model: ......... 0
+
+JK Class: True
+using DIRECT scf and JK class
+
+
+Number of occupied orbitals: 45
+
+using as guess the density from the low level theory hamiltonian
+
+Start SCF iterations:
+
+
+SCF Iteration   1: Energy = -702.3518563277780231   dE = -7.02352E+02   dRMS = 5.44882E-10
+SCF Iteration   2: Energy = -702.3518563277771136   dE =  9.09495E-13   dRMS = 1.28967E-09
+Total time for SCF iterations: 25.872 seconds 
+
+
+Final scf BO energy: -702.35185633 hartree
+
+Orbital (BO) Energies [Eh]
+
+Doubly Occupied:
+
+1A : -23.938505
+2A : -18.424114
+3A : -18.343784
+4A : -18.343426
+5A : -18.332127
+6A : -18.331703
+7A : -18.326147
+8A : -18.324930
+9A : -18.323286
+10A : -0.749994
+11A : -0.719096
+12A : -0.685268
+13A : -0.680005
+14A : -0.677671
+15A : -0.675599
+16A : -0.670580
+17A : -0.661740
+18A : -0.653626
+19A : -0.298758
+20A : -0.239833
+21A : -0.238215
+22A : -0.233211
+23A : -0.228958
+24A : -0.224467
+25A : -0.215230
+26A : -0.209108
+27A : -0.086223
+28A : -0.065017
+29A : -0.062605
+30A : -0.060684
+31A : -0.030946
+32A : -0.022839
+33A : -0.010294
+34A : -0.007877
+35A : -0.000383
+36A : 0.003953
+37A : 0.017265
+38A : 0.024410
+39A : 0.064963
+40A : 0.070537
+41A : 0.076075
+42A : 0.076818
+43A : 0.077489
+44A : 0.081805
+45A : 0.087204
+Virtual:
+
+46A : 0.267844
+47A : 0.281940
+48A : 0.296845
+49A : 0.301407
+50A : 0.402822
+51A : 0.453305
+52A : 0.476451
+53A : 0.488646
+54A : 0.504540
+55A : 0.522339
+56A : 0.532112
+57A : 0.549284
+58A : 0.558516
+59A : 0.572579
+60A : 0.595758
+61A : 0.610820
+62A : 0.654093
+63A : 0.683815
+64A : 0.768053
+65A : 0.819988
+66A : 0.935147
+67A : 0.977195
+68A : 1.045518
+69A : 1.123503
+70A : 1.202044
+71A : 1.225380
+72A : 1.330799
+73A : 1.380812
+74A : 1.694402
+75A : 2.757326
+76A : 2.759639
+77A : 2.781179
+78A : 2.804618
+79A : 2.806258
+80A : 2.814842
+81A : 2.827306
+82A : 2.834927
+83A : 2.865817
+84A : 2.918670
+85A : 2.925348
+86A : 3.005925
+87A : 4.868788
+88A : 4.890309
+89A : 4.931652
+90A : 8.457065
+91A : 8.460446
+92A : 8.465316
+93A : 8.465972
+94A : 8.473758
+95A : 8.488589
+96A : 8.514244
+97A : 8.861297
+98A : 8.864016
+99A : 8.891358
+100A : 8.921588
+101A : 8.989794
+102A : 10.151007
+Final SCF (Density Corrected) energy: -702.35185633 hartree
+
+
+electric dipole moment in ea0
+
+x : 191.07401863, y : 18.10789805, z : -31.82605478
+
+Compare wfn.Da() and Dscf. SUCCESS: True
+
+Max of the abs density difference : 1.741863892013e-08
+

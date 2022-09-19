@@ -1,0 +1,87 @@
+#!/bin/sh
+# Sample script for parallel
+#--------------------------------------------------
+
+#PBS -N bommert
+#PBS -S /bin/bash
+#PBS -j oe
+#PBS -m e
+#PBS -M username
+#PBS -l nodes=1:ppn=8
+#PBS -l pmem=10000mb
+
+# PBS options, see also the man page for qsub:
+#
+# #PBS -S /bin/bash                           # the job execution shell
+# #PBS -j oe                                  # stdout and stderr are merged
+# #PBS -m e                                   # send e-mail when job finishes
+# #PBS -M username                            # your user-name for e-mail
+#PBS -l walltime=18:00:00                    # job requirements
+##PBS -l nodes=1:ppn=1                       # nodes and processors per node for parallel jobs
+#
+# The default WALLTIME time is walltime=1:00:00 (1 hour). If you need more you have to
+# specify it. The WALLTIME time limits for the queues are currently:
+#   short   max.walltime=04:00:00
+#  xmedium  max.walltime=72:00:00
+#  xlong    max.walltime=500:00:00
+#  bigtmp   max.walltime=1000:00:00
+
+# environment variable setup
+#module load anaconda2 # for python2
+module load anaconda3 # for python3
+module load psi4
+export Project=jobname
+source settmpdir                       # local work directory on the execution host
+export CurrDir=$PBS_O_WORKDIR          # directory with input and output files
+export LocDIR=/home/desantis/test/aug-cc-pvtz/sto-3g/plot_orb
+export PSI4_LIBS=/home/desantis/emft_psi4
+export PSI4_BOMME_RLMO=/home/desantis/emft_psi4/GS/RLMO
+export PSI_SCRATCH=/home/desantis/psi4scratch
+LANG=C                          # some programs just don't like
+LC_ALL=C                        # internationalized environments!
+export LANG LC_ALL
+
+#printenv                       # uncomment to see all environment variables
+#set -x                         # uncomment to get all commands echo'ed
+
+cat $PBS_NODEFILE > $CurrDir/hostsfiles
+export HOSTS_FILE=$CurrDir/hostsfiles
+export OMP_NUM_THREADS=12
+export MKL_NUM_THREADS=2
+export NCPUS=`cat \$PBS_NODEFILE | wc -l`
+cat $PBS_NODEFILE               # this file contains the nodes that were
+                                # allocated for your job if you use MPI or PVM
+
+# Here the real job starts
+#
+echo "#--- Job started at `date`"
+echo "#--- Running with $NCPUS processors" 
+echo "#--- on nodes: "
+cat $PBS_NODEFILE
+
+# create the temporary directory and make sure the input directory is
+# accessible
+mkdir -p $TMPDIR || exit 1
+cd $CurrDir || exit 2
+
+# copy all necessary files (input, source, programs etc.) to the execution
+# host
+#cp files $TMPDIR
+
+# run the job locally on the execution host
+cd $TMPDIR
+
+# Run calculation
+echo "Start Python program"
+#python ~/emft_psi4/rt_bomme.py -d -a 2 -gA /home/desantis/bomme_rt/H2O.xyz -gB /home/desantis/bomme_rt/NH3.xyz -o1 aug-cc-pvdz -o2 cc-pvdz -f1 b3lyp -f2 blyp > res.out  
+python ~/emft_psi4/GS/RLMO/reference.py -gB $LocDIR/water_8.xyz -gA $LocDIR/F-.xyz  --func1 b3lyp --func2 blyp --jkclass --scf_type direct --numpy_mem 10 --obs1 aug-cc-pvtz --obs2 sto-3g  --scf_type direct -z -1 -zA -1 --cdump --occ_list "11;23;31;32;33" --virt_list "34;35;36;37;38;39;41;42;43"  > res.out
+
+#python ~/emft_psi4/test_gs.py -d -a 2 --numpy_mem 1 -gA /home/desantis/bomme_rt/H2O.xyz -gB /home/desantis/bomme_rt/NH3.xyz --input-param-file /home/desantis/bomme_rt/input.inp --obs1 def2-tzvp --obs2 def2-svp --func1 b3lyp --func2 blyp > res.out
+# copy all output files from the execution host back to $CurrDir
+mv res.out $CurrDir
+mv locality* $CurrDir
+mv *.cube $CurrDir
+# remove the temporary directory if $CurrDir is accessible
+cd $CurrDir && rm -rf $TMPDIR     # uncomment this for automatic cleanup
+
+echo "#--- Job ended at `date`"
