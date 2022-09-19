@@ -1,2 +1,2 @@
 # bomme_rt
-Ground state DFT and RT-TDDFT base on mean-field BOMME
+Block-Orthogonalized Manby-Miller mean-field embedding implementation of ground state DFT and RT-TDDFT
