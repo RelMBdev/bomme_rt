@@ -16,7 +16,16 @@ import numpy as np
 import psi4
 from pkg_resources import parse_version
 
+import time
+from datetime import datetime
 
+sys.path.insert(0, "../common")
+modpaths = os.environ.get('COMMON_PATH')
+
+if modpaths is not None :
+    for path in modpaths.split(";"):
+        sys.path.append(path)
+import bo_helper
 ##################################################################
 
 def exp_opmat(mat,dt):
@@ -203,7 +212,6 @@ def analytic(Fmax, w, t, t0=0.0, s=0.0):
    return func
 
 ##################################################################
-##################################################################
 
 funcswitcher = {
     "kick": kick,
@@ -217,6 +225,49 @@ funcswitcher = {
     "imp_field": imp_field
      }
    
+##################################################################
+# analysis based on MO-weighted dipole
+
+def dipoleanalysis(dipole,dmat,nocc,occlist,virtlist,debug=False,HL=False):
+    #virtlist can also contain occupied orbitals !check
+    #just HOMO-LUMO vertical transition
+    tot = len(occlist)*len(virtlist)
+    if HL:
+      i = nocc
+      a = nocc+1
+      res = dipole[i-1,a-1]*dmat[a-1,i-1] + dipole[a-1,i-1]*dmat[i-1,a-1]
+    else:
+      res = np.zeros(tot,dtype=np.complex128)
+      count = 0
+      for i in occlist:
+        for j in virtlist:
+           res[count] = dipole[i-1,j-1]*dmat[j-1,i-1] + dipole[j-1,i-1]*dmat[i-1,j-1]
+           count +=1
+    return res
+##################################################################
+def dipole_selection(dipole,idlist,nocc,occlist,virtlist,odbg=sys.stderr,debug=False):
+    
+    if debug:
+       odbg.write("Selected occ. Mo: %s \n"% str(occlist))
+       odbg.write("Selected virt. Mo: %s \n"% str(virtlist))
+    offdiag = np.zeros_like(dipole)
+    #diag = numpy.diagonal(tmp)
+    #diagonal = numpy.diagflat(diag)
+    nvirt = dipole.shape[0]-nocc
+    odbg.write("n. virtual orbitals : %i\n" % nvirt)
+    if (idlist == -99):
+      for b in range(nvirt):
+        for j in occlist:
+          offdiag[nocc+b,j-1] = dipole[nocc+b,j-1]
+    else:
+      for b in virtlist:
+        for j in  occlist:
+          offdiag[b-1,j-1] = dipole[b-1,j-1]
+    offdiag=(offdiag+np.conjugate(offdiag.T))
+    #offdiag+=diagonal
+    res = offdiag
+
+    return res
 ##################################################################
 
 def mo_fock_mid_forwd_eval(D_ti,fock_mid_ti_backwd,i,delta_t,H,I,U,dipole,\
@@ -235,7 +286,7 @@ def mo_fock_mid_forwd_eval(D_ti,fock_mid_ti_backwd,i,delta_t,H,I,U,dipole,\
     
     k=1
     
-    Eh_i,Exclow_i,ExcAAhigh_i,ExcAAlow_i,fock_mtx=get_BOFockRT(D_ti,H,I,U,func_h,func_l,basisset,bsetH)
+    Eh_i,Exclow_i,ExcAAhigh_i,ExcAAlow_i,fock_mtx = bo_helper.get_BOFockRT(D_ti,H,I,U,func_h,func_l,basisset,bsetH)
     #DEBUG
     #ExcAAhigh_i=0.0
     #ExcAAlow_i=0.0
@@ -282,7 +333,7 @@ def mo_fock_mid_forwd_eval(D_ti,fock_mid_ti_backwd,i,delta_t,H,I,U,dipole,\
         
         #DEBUG
         #dum1,dum2,fock_mtx=get_Fock(D_ti_dt,H,I,func_l,basisset)
-        dum0,dum1,dum2,dum3,fock_mtx=get_BOFockRT(D_ti_dt,H,I,U,func_h,func_l,basisset,bsetH)
+        dum0,dum1,dum2,dum3,fock_mtx = bo_helper.get_BOFockRT(D_ti_dt,H,I,U,func_h,func_l,basisset,bsetH)
         #print('fockmtx s in loop max diff: %.12e\n' % np.max(tfock_mtx-fock_mtx))
         #update t_arg+=delta_t
         pulse_dt = func(imp_opts['Fmax'], imp_opts['w'], t_arg+delta_t,\
@@ -309,371 +360,403 @@ def mo_fock_mid_forwd_eval(D_ti,fock_mid_ti_backwd,i,delta_t,H,I,U,dipole,\
          raise Exception("Numember of iterations exceeded (k>20)")
     return Eh_i,Exclow_i,ExcAAhigh_i,ExcAAlow_i,pulse,fock_ti_ao,fock_inter
 ##################################################################
+# mo_select : string containing two substrings "-2; list_occ & list_vist"
+# selective_pert : bool.  Turn on selective perturbation. See Repisky M et al 2015
+# local_basis : bool . Use a localized basis instead of ground-state MOs
+# exA_only : excite only A subsystem; either using local_bas or selective_pert or numerical approach
+def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_select, selective_pert, local_basis, exA_only, numpy_mem,debug):
 
-def run_rt_iterations(inputfname, bset, wfn_bo, embmol, mo_select, debug):
-	#a minimalistic RT propagation code
-	molist = mo_select.split("&")
-	occlist = molist[0].split(";")
-	occlist = [int(m) for m in occlist]
-	do_weighted = occlist.pop(0)
-	virtlist = molist[1].split(";")
-	virtlist = [int(m) for m in virtlist]
-
-	#for TNO analysis
-	#tlist = args.tlist.split("&")
-	#mlist = tlist[0].split(";")
-	#mlist = [int(m) for m in mlist]
-	#plist = tlist[1].split(";")
-	#plist = [int(m) for m in plist]
-
-	if (do_weighted == -2):
-	  if debug:
-	    print("Selected transitions from %s to %s MOs"% (str(occlist), str(virtlist)))
-
-	### frequency bin container ###
-	#freqlist = args.freq.split(";")
-	#freqlist = [np.float_(m) for m in freqlist]
-	#if ( (freqlist == np.zeros(len(freqlist))).all() and args.ftden ):
-	#         raise Exception("Check list of frequencies for ftden")
-	###
-
-	imp_opts, calc_params = set_params(inputfname)
-
-	if imp_opts['imp_type'] == 'analytic' :
-	    analytic = True
-	else:
-	    analytic = False
-
-	#dt in a.u
-	dt =  calc_params['delta_t']
-	#time_int in atomic unit
-	time_int=calc_params['time_int']
-	niter=int(time_int/dt)
-
-	## get matrices on BO basis
-	Ftilde = np.array(wfn_bo['Fock'])
-	Dtilde = np.array(wfn_bo['Dmtx'])
-	C = np.asarray(wfn_bo['Ccoeff']
-	U = np.array(wfn_bo['Umat']
-	Stilde = np.array(wfn_bo['Ovap']
-
-	#initialize the mints object
-
-	#dip_mat is transformed in the BO basis
-	dip_mat=np.matmul(U.T,np.matmul(np.array(dipole[direction]),U))
-
-	dip_dir = [0,1,2]
-	dip_dict={'0' : 'x', '1' : 'y', '2' : 'z'}
-	dip_dir.pop(direction)
-	dmat_offdiag = []
-
-	for i in dip_dir:
-	     dmat_offdiag.append(np.matmul(U.T,np.matmul(np.array(dipole[i]),U)))
-
-	test=np.matmul(C.T,np.matmul(Stilde,C))
-	print("in BO basis C^T Stilde C = 1 : %s" % np.allclose(test,np.eye(C.shape[0])))
-
-	if args.locbasis:
-		localbas=Localizer(Dtilde,np.array(Stilde),counter)
-		localbas.localize()
-		#unsorted orbitals
-		unsorted_orbs=localbas.make_orbitals()
-		#the projector P
-		Phat=np.matmul(Stilde.np[:,:counter],np.matmul(S11_inv,Stilde.np[:counter,:]))
-		#The RLMO are ordered
-		# by descending value of the locality parameter.
-		sorted_orbs = localbas.sort_orbitals(Phat)
-		#the occupation number and the locality measure
-		locality,occnum=localbas.locality()
-		#save the localization parameters and the occupation numbers  
-		np.savetxt('locality_rlmo.out', np.c_[locality,occnum], fmt='%.12e')
-		#check the occupation number of ndimA=counter MOs (of A).
-		occA = int(np.rint( np.sum(occnum[:counter]) ))
-		print("ndocc orbitals (A) after localization: %i\n" % occA)
-		#set the sorted as new basis 
-		C=sorted_orbs
-		#use the density corresponding to (sorted) localized orbitals
-		Dp_0 = np.diagflat(occnum)
-	else:
-	  Dp_0=np.zeros((numbas,numbas))
-	  for num in range(int(ndocc)):
-	      Dp_0[num,num]=1.0
-	try :
-	  C_inv=np.linalg.inv(C)
-	except scipy.linalg.LinAlgError:
-	  print("Error in np.linalg.inv")
-
-	# in an orthonormal basis Dtilde should be diagonal with oo=1, vv=0
-	ODtilde=np.matmul(C_inv,np.matmul(Dtilde,C_inv.T))
-	print("Dtilde is diagonal in the orbital basis: %s" % np.allclose(Dp_0,ODtilde,atol=1.0e-14))
+    numbas = wfn_bo['nbf_tot']
+    nbf_A = wfn_bo['nbf_A']
+    #ndocc refers to the total number of doubly occupied MO
+    ndocc = wfn_bo['ndocc']
+    func_h = wfn_bo['func_h']
+    func_l = wfn_bo['func_l']
+    jkflag = wfn_bo['jkflag']
+    exmodel = wfn_bo['exmodel']
+    scf_type = wfn_bo['scf_type']
 
 
-	#nuclear dipole for non-homonuclear molecules
-	Ndip= embmol.nuclear_dipole()
-	Ndip_dir=Ndip[direction]
-	#for the time being the nuclear dipole contribution to the dipole and energy
-	# is not considered
-	Ndip_dir = 0.0
+    #a minimalistic RT propagation code
+    molist = mo_select.split("&")
+    occlist = molist[0].split(";")
+    occlist = [int(m) for m in occlist]
+    do_weighted = occlist.pop(0)
+    virtlist = molist[1].split(";")
+    virtlist = [int(m) for m in virtlist]
 
-	Enuc_list=[]
-	print("N. iterations: %i\" % niter)
+    #for TNO analysis
+    #tlist = args.tlist.split("&")
+    #mlist = tlist[0].split(";")
+    #mlist = [int(m) for m in mlist]
+    #plist = tlist[1].split(";")
+    #plist = [int(m) for m in plist]
 
-	#set the functional type
-	#if (calc_params['func_type'] == 'svwn5'):
-	#   func = svwn5_func
-	#else:
-	#   func=calc_params['func_type']
+    if (do_weighted == -2):
+      if debug:
+        print("Selected transitions from %s to %s MOs"% (str(occlist), str(virtlist)))
 
-	fo  = open("err.txt", "w")
-	print("analytic : %i" % analytic)
-	if (analytic):
-	   print('Perturb density with analytic delta')
-	   # set the perturbed density -> exp(-ikP)D_0exp(+ikP)
-	   k = imp_opts['Fmax']
-	   if   args.exciteA == 1:
-	     print("Excite only the A subsystem (High level)\n")
-	     #excite only A to prevent leak of the hole/particle density across the AA-BB  boundary
-	     #select AA block in BO basis
-	     tmpA=np.zeros_like(dip_mat)    
-	     tmpA[:counter,:counter]=dip_mat[:counter,:counter]
-	     dip_mo=np.matmul(np.conjugate(C.T),np.matmul(tmpA,C))
-	   else: 
-		#dip_mat is transformed to the reference MO basis
-		print("Dipole matrix is transformed to the MO basis\n")
-		print("Local basis: %s\n" % args.locbasis)
-		dip_mo=np.matmul(np.conjugate(C.T),np.matmul(dip_mat,C))
-	   if args.locbasis and (virtlist[0] == -99) and args.selective_pert:
-		#use occnum to define a virtlist
-		virtlist=[]
-		for m in range(numbas):
-		  if np.rint(np.abs(occnum))[m] < 1.0: 
-		    virtlist.append(m+1)
-		dip_mo=util.dipole_selection(dip_mo,-1,ndocc,occlist,virtlist,fo,debug)
-	   elif args.selective_pert:
-		 dip_mo=util.dipole_selection(dip_mo,virtlist[0],ndocc,occlist,virtlist,fo,debug)
-	       
-	   u0=util.exp_opmat(dip_mo,np.float_(-k))
-	   Dp_init= np.matmul(u0,np.matmul(Dp_0,np.conjugate(u0.T)))
-	   func_t0=k
-	   #backtrasform Dp_init
-	   D_init=np.matmul(C,np.matmul(Dp_init,np.conjugate(C.T)))
-	   Dtilde = D_init
-	   Dp_0 = Dp_init 
-	   
-	   #J0p,Exc0p,F_t0=util.get_Fock(D_ti,H,I,func,basisset)
-	   #if (func == 'hf'):                                  
-	   #    testene = np.trace(np.matmul(D_init,(H+F_t0)))  
-	   #else:                                               
-	   #    testene = 2.00*np.trace(np.matmul(D_init,H))+J0p+Exc0p
-	   #print('trace D(0+): %.8f' % np.trace(Dp_init).real)       
-	   #print(testene+Nuc_rep)                                    
+    ### frequency bin container ###
+    #freqlist = args.freq.split(";")
+    #freqlist = [np.float_(m) for m in freqlist]
+    #if ( (freqlist == np.zeros(len(freqlist))).all() and args.ftden ):
+    #         raise Exception("Check list of frequencies for ftden")
+    ###
 
-	#containers
-	ene_list = []
-	dip_list = []
-	dip_offdiag0 = []
-	dip_offdiag1 = []
-	imp_list=[]
-	weighted_dip = []
-	time_list = []
-	td_container = []
-	dip_list_p = []
-	#for molecules with permanent nuclear dipole add Enuc_list[k] to ene
-	#note that : i.e in the case of linear symmetric molecule the nuclear dipole can be zero depending
-	#on the choice of reference coordinates system
+    imp_opts, calc_params = set_params(inputfname)
 
-	dipmo_mat=np.matmul(np.conjugate(C.T),np.matmul(dip_mat,C))
+    if imp_opts['imp_type'] == 'analytic' :
+        analytic = True
+    else:
+        analytic = False
 
-	now = datetime.now()
-	dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+    #dt in a.u
+    dt =  calc_params['delta_t']
+    #time_int in atomic unit
+    time_int=calc_params['time_int']
+    niter=int(time_int/dt)
 
-	print("RT-propagation started at: %s" % dt_string)
-	print('Entering in the first step of propagation')
-	start =time.time()
-	cstart =time.process_time()
-	Eh0,Exclow0,ExcAAhigh0,ExcAAlow0,func_t0,F_t0,fock_mid_init=util.mo_fock_mid_forwd_eval(Dtilde,Ftilde,\
-				0,np.float_(dt),Htilde,I,U,dip_mat,C,C_inv,Stilde,numbas,imp_opts,func_h,func_l,fo,bset,bsetH,args.exciteA)
+    ## get matrices on BO basis
+    Htilde = np.array(wfn_bo['Hcore'])
+    Ftilde = np.array(wfn_bo['Fock'])
+    Dtilde = np.array(wfn_bo['Dmtx'])
+    C = np.asarray(wfn_bo['Ccoeff'])
+    U = np.array(wfn_bo['Umat'])
+    Stilde = np.array(wfn_bo['Ovap'])
 
-	#DEBUG
-	#import bo_helper
-	#dum1,dum2,dum3,dum4,F_t0=bo_helper.get_BOFockRT(Dtilde, Htilde, I,U, func_h, func_l, bset,bsetH)
-	diff_midF=fock_mid_init-Ftilde
+    #initialize the mints object
+    mints = psi4.core.MintsHelper(bset)
 
-	norm_diff=np.linalg.norm(diff_midF,'fro')
-	fo.write('||Fock_mid(%i+1/2)-Fock_mid(%i-1/2)||_fro : %.8f\n' % (0,0,norm_diff))
+    # Run a quick check to make sure everything will fit into memory
+    I_Size = (numbas**4) * 8.e-9
+    print("\nSize of the ERI tensor will be %4.2f GB." % I_Size)
+    
+    # Estimate memory usage
+    memory_footprint = I_Size * 1.5
+    if I_Size > numpy_mem:
+        psi4.core.clean()
+        raise Exception("Estimated memory utilization (%4.2f GB) " +\
+                "exceeds numpy_memory limit of %4.2f GB." % (memory_footprint, numpy_mem))
+    #Get Eri (2-electron repulsion integrals)
+    I = np.array(mints.ao_eri())
 
-	###
-	#if ftden:
-	#    #tdmat = np.matmul(U,np.matmul((Dtilde-Dtilde),np.conjugate(U.T)))
-	#    tdmat = Dtilde-Dtilde
-	#    for n in  binlist:
-	#       td_container.append(tdmat * np.exp( -2.0j*np.pi*0*n/Ns))
-	#if args.dump:
-	#  os.mkdir("td.0000000")
-	#  xs,ys,zs,ws,N,O = cube_util.setgridcube(mol,L,D)
-	#  phi,lpos,nbas=cube_util.phi_builder(mol,xs,ys,zs,ws,basis_set)
-	#  cube_util.denstocube(phi,Da,S,ndocc,mol,"density",O,N,D)
-	#  os.rename("density.cube","td.0000000/density.cube")
-	###
+    #dip_mat is transformed in the BO basis
+    dipole=mints.ao_dipole()
+    dip_mat=np.matmul(U.T,np.matmul(np.array(dipole[direction]),U))
 
-	### TO BE REWORKED
-	#check the Fock
-	if debug :
-	     print('F_t0 is equal to GS Ftilde : %s' % np.allclose(Ftilde,F_t0,atol=1.0e-12))
-	     print('Max of  abs(F_t0 - GS Ftilde) : %.12e\n' % np.max(np.abs(F_t0-Ftilde)))
-	#check hermicity of fock_mid_init
+    dip_dir = [0,1,2]
+    dip_dict={'0' : 'x', '1' : 'y', '2' : 'z'}
+    dip_dir.pop(direction)
+    dmat_offdiag = []
 
-	Ah=np.conjugate(fock_mid_init.T)
-	fo.write('Fock_mid hermitian: %s\n' % np.allclose(fock_mid_init,Ah))
+    for i in dip_dir:
+         dmat_offdiag.append(np.matmul(U.T,np.matmul(np.array(dipole[i]),U)))
 
-	#propagate D_t0 -->D(t0+dt)
-	#
-	#fock_mid_init is transformed in the MO ref basis
-	fockp_mid_init=np.matmul(np.conjugate(C.T),np.matmul(fock_mid_init,C))
+    test=np.matmul(C.T,np.matmul(Stilde,C))
+    print("in BO basis C^T Stilde C = 1 : %s" % np.allclose(test,np.eye(C.shape[0])))
 
-	#u=scipy.linalg.expm(-1.j*fockp_mid_init*dt)
-	u=util.exp_opmat(fockp_mid_init,np.float_(dt))
+    if local_basis:
+            localbas=Localizer(Dtilde,np.array(Stilde),nbf_A)
+            localbas.localize()
+            #unsorted orbitals
+            unsorted_orbs=localbas.make_orbitals()
+            #the projector P
+            Phat=np.matmul(Stilde.np[:,:nbf_A],np.matmul(S11_inv,Stilde.np[:nbf_A,:]))
+            #The RLMO are ordered
+            # by descending value of the locality parameter.
+            sorted_orbs = localbas.sort_orbitals(Phat)
+            #the occupation number and the locality measure
+            locality,occnum=localbas.locality()
+            #save the localization parameters and the occupation numbers  
+            np.savetxt('locality_rlmo.out', np.c_[locality,occnum], fmt='%.12e')
+            #check the occupation number of ndimA=nbf_A MOs (of A).
+            occA = int(np.rint( np.sum(occnum[:nbf_A]) ))
+            print("ndocc orbitals (A) after localization: %i\n" % occA)
+            #set the sorted as new basis 
+            C=sorted_orbs
+            #use the density corresponding to (sorted) localized orbitals
+            Dp_0 = np.diagflat(occnum)
+    else:
+      Dp_0=np.zeros((numbas,numbas))
+      for num in range(int(ndocc)):
+          Dp_0[num,num]=1.0
+    try :
+      C_inv=np.linalg.inv(C)
+    except scipy.linalg.LinAlgError:
+      print("Error in np.linalg.inv")
 
-	temp=np.matmul(Dp_0,np.conjugate(u.T))
-
-	Dp_t1=np.matmul(u,temp)
-
-	#check u if unitary
-	test_u=np.matmul(u,np.conjugate(u.T))
-	fo.write('U is unitary :%s\n' % np.allclose(test_u,np.eye(u.shape[0])))
-
-	fock_mid_backwd=np.copy(fock_mid_init)
-
-	#backtrasform Dp_t1
-
-	D_t1=np.matmul(C,np.matmul(Dp_t1,np.conjugate(C.T)))
-
-	ene_list.append(Eh0 + Exclow0 + ExcAAhigh0 -ExcAAlow0 + Enuc + 2.0*np.trace(np.matmul(Dtilde,Htilde)) )
-
-	dip_list.append(np.trace(np.matmul(Dtilde,dip_mat)))
-	dip_offdiag0.append(np.trace(np.matmul(Dtilde,dmat_offdiag[0])))
-	dip_offdiag1.append(np.trace(np.matmul(Dtilde,dmat_offdiag[1])))
-	#weighted dipole
-	if (do_weighted == -2):
-	  if virtlist[0] ==-99 and ((not args.locbasis ) or (not args.selective_pert)) :
-	    virtlist=[]
-	    for m in range(ndocc,numbas):
-		virtlist.append(m+1)
-	  res = util.dipoleanalysis(dipmo_mat,Dp_0,ndocc,occlist,virtlist,debug,HL)
-	  weighted_dip.append(res)
-
-	fock_mid_backwd=np.copy(fock_mid_init) #prepare the fock at the previous midpint
-	D_ti=D_t1
-	Dp_ti=Dp_t1
-	Enuc_list.append(-func_t0*Ndip_dir) #just in case of non-zero nuclear dipole
-	#
-	imp_list.append(func_t0)
-	if debug :  
-	  #trace of D_t1
-	  fo.write('%.8f\n' % np.trace(Dp_ti).real)
-	  fo.write('Trace of DS %.8f\n' % np.trace(np.matmul(Stilde,D_ti)).real)
-	  fo.write('Trace of SD.real %.14f\n' % np.trace(np.matmul(Stilde,D_ti.real)))
-	  fo.write('Trace of SD.imag %.14f\n' % np.trace(np.matmul(Stilde,D_ti.imag)))
-	  fo.write('Dipole %.8f %.15f\n' % (0.000, 2.00*dip_list[0].real))
-
-	for j in range(1,niter+1):
+    # in an orthonormal basis Dtilde should be diagonal with oo=1, vv=0
+    ODtilde=np.matmul(C_inv,np.matmul(Dtilde,C_inv.T))
+    print("Dtilde is diagonal in the orbital basis: %s" % np.allclose(Dp_0,ODtilde,atol=1.0e-14))
 
 
-	    Eh_i,Exclow_i,ExcAAhigh_i,ExcAAlow_i,func_ti,F_ti,fock_mid_tmp=util.mo_fock_mid_forwd_eval(np.copy(D_ti),fock_mid_backwd,\
-						    j,np.float_(dt),Htilde,I,U,dip_mat,C,C_inv,Stilde,numbas,imp_opts,func_h,func_l,fo,bset,bsetH,args.exciteA)
+    #nuclear dipole for non-homonuclear molecules
+    Ndip= embmol.nuclear_dipole()
+    Ndip_dir=Ndip[direction]
+    #for the time being the nuclear dipole contribution to the dipole and energy(nuclear)
+    # is not considered
+    Ndip_dir = 0.0
 
-	    diff_midF=fock_mid_tmp-fock_mid_backwd
+    Enuc_list=[]
+    Enuc = embmol.nuclear_repulsion_energy()
+    print("N. iterations: %i\n" % niter)
 
-	    norm_diff=np.linalg.norm(diff_midF,'fro')
-	    fo.write('||Fock_mid(%i +1/2)- Fock_mid(%i-1/2)||_fro: %.8f\n' % (j,j,norm_diff))
+    #set the functional type
+    #if (calc_params['func_type'] == 'svwn5'):
+    #   func = svwn5_func
+    #else:
+    #   func=calc_params['func_type']
 
-	    ###
-	    #if args.ftden:
-	    #   #tdmat =np.matmul(U,np.matmul((D_ti-Dtilde),np.conjugate(U.T)))
-	    #   tdmat =D_ti-Dtilde
-	    #
-	    #   count=0
-	    #   for n in  binlist:
-	    #      tmp=td_container[count]
-	    #      tmp+=tdmat * np.exp( -2.0j*np.pi*j*n/Ns)
-	    #      td_container[count]=tmp
-	    #      count+=1
-	    #if args.dump:
-	    #   if ( ( j % args.oint ) == 0 ) :
-	    #      path="td."+str(j).zfill(7)
-	    #      os.mkdir(path)
-	    #      cube_util.denstocube(phi,D_ti,S,ndocc,mol,"density",O,N,D)
-	    #      os.rename("density.cube",path+"/density.cube")
+    fo  = open("err.txt", "w")
+    print("analytic : %i" % analytic)
+    if (analytic):
+       print('Perturb density with analytic delta')
+       # set the perturbed density -> exp(-ikP)D_0exp(+ikP)
+       k = imp_opts['Fmax']
+       if   exA_only:
+         print("Excite only the A subsystem (High level)\n")
+         #excite only A to prevent leak of the hole/particle density across the AA-BB  boundary
+         #select AA block in BO basis
+         tmpA=np.zeros_like(dip_mat)    
+         tmpA[:nbf_A,:nbf_A]=dip_mat[:nbf_A,:nbf_A]
+         dip_mo=np.matmul(np.conjugate(C.T),np.matmul(tmpA,C))
+       else: 
+            #dip_mat is transformed to the reference MO basis
+            print("Dipole matrix is transformed to the MO basis\n")
+            print("Local basis: %s\n" % local_basis)
+            dip_mo=np.matmul(np.conjugate(C.T),np.matmul(dip_mat,C))
+       if local_basis and (virtlist[0] == -99) and selective_pert:
+            #use occnum to define a virtlist
+            virtlist=[]
+            for m in range(numbas):
+              if np.rint(np.abs(occnum))[m] < 1.0: 
+                virtlist.append(m+1)
+            dip_mo=dipole_selection(dip_mo,-1,ndocc,occlist,virtlist,fo,debug)
+       elif selective_pert:
+             dip_mo=dipole_selection(dip_mo,virtlist[0],ndocc,occlist,virtlist,fo,debug)
+           
+       u0 = exp_opmat(dip_mo,np.float_(-k))
+       Dp_init= np.matmul(u0,np.matmul(Dp_0,np.conjugate(u0.T)))
+       func_t0=k
+       #backtrasform Dp_init
+       D_init=np.matmul(C,np.matmul(Dp_init,np.conjugate(C.T)))
+       Dtilde = D_init
+       Dp_0 = Dp_init 
+       
+       #J0p,Exc0p,F_t0 = get_Fock(D_ti,H,I,func,basisset)
+       #if (func == 'hf'):                                  
+       #    testene = np.trace(np.matmul(D_init,(H+F_t0)))  
+       #else:                                               
+       #    testene = 2.00*np.trace(np.matmul(D_init,H))+J0p+Exc0p
+       #print('trace D(0+): %.8f' % np.trace(Dp_init).real)       
+       #print(testene+Nuc_rep)                                    
+    
+    #containers
+    ene_list = []
+    dip_list = []
+    dip_offdiag0 = []
+    dip_offdiag1 = []
+    imp_list=[]
+    weighted_dip = []
+    time_list = []
+    td_container = []
+    dip_list_p = []
+    #for molecules with permanent nuclear dipole add Enuc_list[k] to ene
+    #note that : i.e in the case of linear symmetric molecule the nuclear dipole can be zero depending
+    #on the choice of reference coordinates system
 
-	    Ah=np.conjugate(fock_mid_tmp.T)
-	    fo.write('Fock_mid hermitian: %s\n' % np.allclose(fock_mid_tmp,Ah))
-	    #transform fock_mid_init in MO basis
-	    fockp_mid_tmp=np.matmul(np.conjugate(C.T),np.matmul(fock_mid_tmp,C))
-	    u=util.exp_opmat(np.copy(fockp_mid_tmp),np.float_(dt))
-	    #u=scipy.linalg.expm(-1.0j*fockp_mid_tmp*dt)
-	    #check u is unitary
-	    test_u=np.matmul(u,np.conjugate(u.T))
-	    if (not np.allclose(np.eye(u.shape[0]),test_u)):
-		print('U is not unitary\n')
-	    
-	    #check the trace of density to evolve
-	    fo.write('tr of density to evolve: %.8f\n' % np.trace(Dp_ti).real)
-	    
-	    #evolve the density in orthonormal basis
-	    temp=np.matmul(Dp_ti,np.conjugate(u.T))
-	    Dp_ti_dt=np.matmul(u,temp)
+    dipmo_mat=np.matmul(np.conjugate(C.T),np.matmul(dip_mat,C))
 
-	    #backtransform Dp_ti_dt
-	    D_ti_dt=np.matmul(C,np.matmul(Dp_ti_dt,np.conjugate(C.T)))
-	    fo.write('%.8f\n' % np.trace(Dp_ti_dt).real)
-	    #dipole expectation for D_ti
-	    dip_list.append(np.trace(np.matmul(dip_mat,D_ti)))
-	    dip_offdiag0.append(np.trace(np.matmul(D_ti,dmat_offdiag[0])))
-	    dip_offdiag1.append(np.trace(np.matmul(D_ti,dmat_offdiag[1])))
-	    
-	    #for debug
-	    if debug:
-	      fo.write('Dipole  %.8f %.15f\n' % (j*dt, 2.00*dip_list[j].real))
+    now = datetime.now()
+    dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
 
-	    if (do_weighted == -2):
-	      #weighted dipole 
-	      res = util.dipoleanalysis(dipmo_mat,Dp_ti,ndocc,occlist,virtlist,debug,HL)
-	      weighted_dip.append(res)
-	    #Energy expectation value at t = t_i 
-	    ene_list.append(Eh_i + Exclow_i + ExcAAhigh_i -ExcAAlow_i + Enuc + 2.0*np.trace(np.matmul(D_ti,Htilde)) )
-	    Enuc_list.append(-func_ti*Ndip_dir) #just in case of non-zero nuclear dipole
-	    imp_list.append(func_ti)
-	   
-	    #update D_ti and Dp_ti for the next step
-	    
-	    if debug :
-	      fo.write('here I update the matrices Dp_ti and D_ti\n')
-	    D_ti=np.copy(D_ti_dt)
-	    Dp_ti=np.copy(Dp_ti_dt)
-	    #update fock_mid_backwd for the next step
-	    fock_mid_backwd=np.copy(fock_mid_tmp)
+    print("RT-propagation started at: %s" % dt_string)
+    print('Entering in the first step of propagation')
+    start =time.time()
+    cstart =time.process_time()
+    Eh0,Exclow0,ExcAAhigh0,ExcAAlow0,func_t0,F_t0,fock_mid_init = mo_fock_mid_forwd_eval(Dtilde,Ftilde,\
+                            0,np.float_(dt),Htilde,I,U,dip_mat,C,C_inv,Stilde,numbas,imp_opts,func_h,func_l,fo,bset,bsetH,exA_only)
 
-	fo.close()
-	end=time.time()
-	cend = time.process_time()
-	ftime  = open("timing.txt", "w")
-	ftime.write("time for %i time iterations : (%.3f s, %.3f s)\n" %(niter+1,end-start,cend-cstart))
-	ftime.close()
-	now = datetime.now()
-	dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
-	print("RT-propagation ended at: %s" % dt_string)
-	t_point=np.linspace(0.0,niter*dt,niter+1)
-	dip_t=2.00*np.array(dip_list).real
-	ene_t=np.array(ene_list).real
-	imp_t=np.array(imp_list)
+    #DEBUG
+    #import bo_helper
+    #dum1,dum2,dum3,dum4,F_t0 = bo_helper.get_BOFockRT(Dtilde, Htilde, I,U, func_h, func_l, bset,bsetH)
+    diff_midF=fock_mid_init-Ftilde
 
-	if (do_weighted == -2):
-	  wd_dip=2.00*np.array(weighted_dip).real
-	  np.savetxt('weighteddip.txt', np.c_[t_point,wd_dip], fmt='%.12e')
+    norm_diff=np.linalg.norm(diff_midF,'fro')
+    fo.write('||Fock_mid(%i+1/2)-Fock_mid(%i-1/2)||_fro : %.8f\n' % (0,0,norm_diff))
 
-	np.savetxt('dipole-'+2*dip_dict[str(direction)]+'.txt', np.c_[t_point,dip_t], fmt='%.12e')
-	# dipole_ij, i denotes the ith component of dipole vector, j denote the direction of the field
-	np.savetxt('dipole-'+dip_dict[str(dip_dir[0])]+dip_dict[str(direction)]+'.txt', np.c_[t_point,2.00*np.array(dip_offdiag0).real], fmt='%.12e')
-	np.savetxt('dipole-'+dip_dict[str(dip_dir[1])]+dip_dict[str(direction)]+'.txt', np.c_[t_point,2.00*np.array(dip_offdiag1).real], fmt='%.12e')
-	np.savetxt('imp.txt', np.c_[t_point,imp_t], fmt='%.12e')
-	np.savetxt('ene.txt', np.c_[t_point,ene_t], fmt='%.12e')
+    ###
+    #if ftden:
+    #    #tdmat = np.matmul(U,np.matmul((Dtilde-Dtilde),np.conjugate(U.T)))
+    #    tdmat = Dtilde-Dtilde
+    #    for n in  binlist:
+    #       td_container.append(tdmat * np.exp( -2.0j*np.pi*0*n/Ns))
+    #if args.dump:
+    #  os.mkdir("td.0000000")
+    #  xs,ys,zs,ws,N,O = cube_util.setgridcube(mol,L,D)
+    #  phi,lpos,nbas=cube_util.phi_builder(mol,xs,ys,zs,ws,basis_set)
+    #  cube_util.denstocube(phi,Da,S,ndocc,mol,"density",O,N,D)
+    #  os.rename("density.cube","td.0000000/density.cube")
+    ###
+
+    ### TO BE REWORKED
+    #check the Fock
+    if debug :
+         print('F_t0 is equal to GS Ftilde : %s' % np.allclose(Ftilde,F_t0,atol=1.0e-12))
+         print('Max of  abs(F_t0 - GS Ftilde) : %.12e\n' % np.max(np.abs(F_t0-Ftilde)))
+    #check hermicity of fock_mid_init
+
+    Ah=np.conjugate(fock_mid_init.T)
+    fo.write('Fock_mid hermitian: %s\n' % np.allclose(fock_mid_init,Ah))
+
+    #propagate D_t0 -->D(t0+dt)
+    #
+    #fock_mid_init is transformed in the MO ref basis
+    fockp_mid_init=np.matmul(np.conjugate(C.T),np.matmul(fock_mid_init,C))
+
+    #u=scipy.linalg.expm(-1.j*fockp_mid_init*dt)
+    u = exp_opmat(fockp_mid_init,np.float_(dt))
+
+    temp=np.matmul(Dp_0,np.conjugate(u.T))
+
+    Dp_t1=np.matmul(u,temp)
+
+    #check u if unitary
+    test_u=np.matmul(u,np.conjugate(u.T))
+    fo.write('U is unitary :%s\n' % np.allclose(test_u,np.eye(u.shape[0])))
+
+    fock_mid_backwd=np.copy(fock_mid_init)
+
+    #backtrasform Dp_t1
+
+    D_t1=np.matmul(C,np.matmul(Dp_t1,np.conjugate(C.T)))
+
+    ene_list.append(Eh0 + Exclow0 + ExcAAhigh0 -ExcAAlow0 + Enuc + 2.0*np.trace(np.matmul(Dtilde,Htilde)) )
+
+    dip_list.append(np.trace(np.matmul(Dtilde,dip_mat)))
+    dip_offdiag0.append(np.trace(np.matmul(Dtilde,dmat_offdiag[0])))
+    dip_offdiag1.append(np.trace(np.matmul(Dtilde,dmat_offdiag[1])))
+    #weighted dipole
+    if (do_weighted == -2):
+      if virtlist[0] ==-99 and ((not args.locbasis ) or (not args.selective_pert)) :
+        virtlist=[]
+        for m in range(ndocc,numbas):
+            virtlist.append(m+1)
+      res = dipoleanalysis(dipmo_mat,Dp_0,ndocc,occlist,virtlist,debug,HL)
+      weighted_dip.append(res)
+
+    fock_mid_backwd=np.copy(fock_mid_init) #prepare the fock at the previous midpint
+    D_ti=D_t1
+    Dp_ti=Dp_t1
+    Enuc_list.append(-func_t0*Ndip_dir) #just in case of non-zero nuclear dipole
+    #
+    imp_list.append(func_t0)
+    if debug :  
+      #trace of D_t1
+      fo.write('%.8f\n' % np.trace(Dp_ti).real)
+      fo.write('Trace of DS %.8f\n' % np.trace(np.matmul(Stilde,D_ti)).real)
+      fo.write('Trace of SD.real %.14f\n' % np.trace(np.matmul(Stilde,D_ti.real)))
+      fo.write('Trace of SD.imag %.14f\n' % np.trace(np.matmul(Stilde,D_ti.imag)))
+      fo.write('Dipole %.8f %.15f\n' % (0.000, 2.00*dip_list[0].real))
+
+    for j in range(1,niter+1):
+
+
+        Eh_i,Exclow_i,ExcAAhigh_i,ExcAAlow_i,func_ti,F_ti,fock_mid_tmp = mo_fock_mid_forwd_eval(np.copy(D_ti),fock_mid_backwd,\
+                                                j,np.float_(dt),Htilde,I,U,dip_mat,C,C_inv,Stilde,numbas,imp_opts,func_h,func_l,fo,bset,bsetH,exA_only)
+
+        diff_midF=fock_mid_tmp-fock_mid_backwd
+
+        norm_diff=np.linalg.norm(diff_midF,'fro')
+        fo.write('||Fock_mid(%i +1/2)- Fock_mid(%i-1/2)||_fro: %.8f\n' % (j,j,norm_diff))
+
+        ###
+        #if args.ftden:
+        #   #tdmat =np.matmul(U,np.matmul((D_ti-Dtilde),np.conjugate(U.T)))
+        #   tdmat =D_ti-Dtilde
+        #
+        #   count=0
+        #   for n in  binlist:
+        #      tmp=td_container[count]
+        #      tmp+=tdmat * np.exp( -2.0j*np.pi*j*n/Ns)
+        #      td_container[count]=tmp
+        #      count+=1
+        #if args.dump:
+        #   if ( ( j % args.oint ) == 0 ) :
+        #      path="td."+str(j).zfill(7)
+        #      os.mkdir(path)
+        #      cube_util.denstocube(phi,D_ti,S,ndocc,mol,"density",O,N,D)
+        #      os.rename("density.cube",path+"/density.cube")
+
+        Ah=np.conjugate(fock_mid_tmp.T)
+        fo.write('Fock_mid hermitian: %s\n' % np.allclose(fock_mid_tmp,Ah))
+        #transform fock_mid_init in MO basis
+        fockp_mid_tmp=np.matmul(np.conjugate(C.T),np.matmul(fock_mid_tmp,C))
+        u = exp_opmat(np.copy(fockp_mid_tmp),np.float_(dt))
+        #u=scipy.linalg.expm(-1.0j*fockp_mid_tmp*dt)
+        #check u is unitary
+        test_u=np.matmul(u,np.conjugate(u.T))
+        if (not np.allclose(np.eye(u.shape[0]),test_u)):
+            print('U is not unitary\n')
+        
+        #check the trace of density to evolve
+        fo.write('tr of density to evolve: %.8f\n' % np.trace(Dp_ti).real)
+        
+        #evolve the density in orthonormal basis
+        temp=np.matmul(Dp_ti,np.conjugate(u.T))
+        Dp_ti_dt=np.matmul(u,temp)
+
+        #backtransform Dp_ti_dt
+        D_ti_dt=np.matmul(C,np.matmul(Dp_ti_dt,np.conjugate(C.T)))
+        fo.write('%.8f\n' % np.trace(Dp_ti_dt).real)
+        #dipole expectation for D_ti
+        dip_list.append(np.trace(np.matmul(dip_mat,D_ti)))
+        dip_offdiag0.append(np.trace(np.matmul(D_ti,dmat_offdiag[0])))
+        dip_offdiag1.append(np.trace(np.matmul(D_ti,dmat_offdiag[1])))
+        
+        #for debug
+        if debug:
+          fo.write('Dipole  %.8f %.15f\n' % (j*dt, 2.00*dip_list[j].real))
+
+        if (do_weighted == -2):
+          #weighted dipole 
+          res = dipoleanalysis(dipmo_mat,Dp_ti,ndocc,occlist,virtlist,debug,HL)
+          weighted_dip.append(res)
+        #Energy expectation value at t = t_i 
+        ene_list.append(Eh_i + Exclow_i + ExcAAhigh_i -ExcAAlow_i + Enuc + 2.0*np.trace(np.matmul(D_ti,Htilde)) )
+        Enuc_list.append(-func_ti*Ndip_dir) #just in case of non-zero nuclear dipole
+        imp_list.append(func_ti)
+       
+        #update D_ti and Dp_ti for the next step
+        
+        if debug :
+          fo.write('here I update the matrices Dp_ti and D_ti\n')
+        D_ti=np.copy(D_ti_dt)
+        Dp_ti=np.copy(Dp_ti_dt)
+        #update fock_mid_backwd for the next step
+        fock_mid_backwd=np.copy(fock_mid_tmp)
+
+    fo.close()
+    end=time.time()
+    cend = time.process_time()
+    ftime  = open("timing.txt", "w")
+    ftime.write("time for %i time iterations : (%.3f s, %.3f s)\n" %(niter+1,end-start,cend-cstart))
+    ftime.close()
+    now = datetime.now()
+    dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+    print("RT-propagation ended at: %s" % dt_string)
+    t_point=np.linspace(0.0,niter*dt,niter+1)
+    dip_t=2.00*np.array(dip_list).real
+    ene_t=np.array(ene_list).real
+    imp_t=np.array(imp_list)
+
+    if (do_weighted == -2):
+      wd_dip=2.00*np.array(weighted_dip).real
+      np.savetxt('weighteddip.txt', np.c_[t_point,wd_dip], fmt='%.12e')
+
+    np.savetxt('dipole-'+2*dip_dict[str(direction)]+'.txt', np.c_[t_point,dip_t], fmt='%.12e')
+    # dipole_ij, i denotes the ith component of dipole vector, j denote the direction of the field
+    np.savetxt('dipole-'+dip_dict[str(dip_dir[0])]+dip_dict[str(direction)]+'.txt', np.c_[t_point,2.00*np.array(dip_offdiag0).real], fmt='%.12e')
+    np.savetxt('dipole-'+dip_dict[str(dip_dir[1])]+dip_dict[str(direction)]+'.txt', np.c_[t_point,2.00*np.array(dip_offdiag1).real], fmt='%.12e')
+    np.savetxt('imp.txt', np.c_[t_point,imp_t], fmt='%.12e')
+    np.savetxt('ene.txt', np.c_[t_point,ene_t], fmt='%.12e')

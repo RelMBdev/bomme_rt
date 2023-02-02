@@ -48,15 +48,20 @@ if __name__ == "__main__":
             default=0, type = int)
     parser.add_argument("-x", "--exmodel", help="Set the exchange model (EX-0 or EX-1) between subsystems (default EX: 0)",
             default=0, type = int)
+    parser.add_argument("-a", "--axis", help="Set the boost direction: x:0|y:1|z:2 (default 2)",
+            default=2, type = int)
 
     # options for RT 
     parser.add_argument("--real_time", help="Real time propagation on", required=False,
             default=False, action="store_true")
     parser.add_argument("--fitted_rt", help="Real time propagation using fitted J matrix", required=False,
             default=False, action="store_true")
-    parser.add_argument("--fitt_HF_exch", help="If Fitted_RT = True (and JKClass is employed) use fitted HF exchange (for HYBRIDs)",                       required=False,default=False, action="store_true")
-    parser.add_argument("-exA", "--exciteA", help="Only the A subsystem is excited : set model (mod 1, mod 2, default 0)", 
-                       required=False,default=0, type = int)
+    parser.add_argument("--fitt_HF_exch", help="If Fitted_RT = True (and JKClass is employed) use fitted HF exchange (for HYBRIDs)",
+                       required=False,default=False, action="store_true")
+    parser.add_argument("--exciteA_only", help="Only the A subsystem is excited", 
+                       required=False,default=False, action="store_true")
+    parser.add_argument("--local_basis", help="Use local basis ", required=False,
+                       default=False, action="store_true")
     parser.add_argument("--select", help="Specify the occ-virt MO weighted dipole moment. (-2; occ_list & virt_list).\
                          Occ/virt_list is a list of numbers separated by semicolon. To include all the virtual mainfold\
                           set virt_list=-99 (default: 0; 0 & 0)",default="0; 0 & 0", type=str)
@@ -65,25 +70,35 @@ if __name__ == "__main__":
                        default=False, action="store_true")
     parser.add_argument("-p", "--principal", help="Restrict weighted dipole moment to HOMO->LUMO", required=False,
                        default=False, action="store_true")
-    parser.add_argument("--input-param-file", help="Set input parameters filename [default=\"input.inp\"]", 
-                       required=False, default="input.inp", type=str, dest='inputfname')
+    parser.add_argument("-f","--input", help="Set input parameters filename [defaul input.inp]", 
+                       required=False, default="input.inp", type=str)
 
     args = parser.parse_args()
 
     # call functions here    
-    bset,bsetH,moltot,psi4mol,wfn = initialize(args.jkclass,args.scf_type,args.obs1,args.obs2,args.geomA,\
+    bset,bsetH, molelecule_str, psi4mol, wfn = initialize(args.jkclass,args.scf_type,args.obs1,args.obs2,args.geomA,\
                    args.geomB,args.func1,args.func2,args.charge)
 
 
     res, wfnBO = run(args.jkclass,args.scf_type,psi4mol,bset,bsetH,args.guess,args.func1,args.func2,args.exmodel,wfn,args.numpy_mem)
-    
+    import rt_mod
+
+
+
     if args.real_time:
+       
+       fnameinput = args.input
+       if not os.path.isfile(fnameinput):
+           print("File ", fnameinput, " does not exist")
+           exit(1)
+
        print("Startig real-time tddft computation")
        #check options consistency
        if args.fitted_rt and (not args.fitt_HF_exch):
           raise "Check RT and HF exchange fitting flag\n"
        
        if (not args.fitted_rt) and (not args.fitt_HF_exch):
-
-          # call rt using the four indeces I tensor (for small systems due to memory requirements)
+          print()
+          # call rt using the four indices I tensor (for small systems due to memory requirements)
+          rt_mod.run_rt_iterations(fnameinput, bset, bsetH, wfnBO, psi4mol, args.axis, args.select, args.selective_pert, args.local_basis, args.exciteA_only, args.numpy_mem, args.debug)
          

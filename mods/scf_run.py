@@ -326,6 +326,8 @@ def run(jkflag,scf_type,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,numpy_
     wfn.Fa().copy( psi4.core.Matrix.from_array(Fscf) )
     wfn.Fb().copy( psi4.core.Matrix.from_array(Fscf) )
     
-    wfn_BObasis = {'Fock' : Ftilde, 'Dmtx' : Dtilde, 'Ccoeff' : C, 'Ovap' : Stilde, 'Umat' : U}
+    wfn_BObasis = {'Fock' : Ftilde, 'Hcore': Htilde, 'Dmtx' : Dtilde, 'Ccoeff' : C, 'Ovap' : Stilde, 'Umat' : U,\
+                    'nbf_A': nbfA, 'nbf_tot' : numbas, 'ndocc' : ndocc,'jkflag' : jkflag, 'scf_type' : scf_type,\
+                    'func_h': func_h, 'func_l' : func_l, 'exmodel':exmodel }
     
     return wfn, wfn_BObasis
