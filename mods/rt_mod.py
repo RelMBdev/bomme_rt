@@ -26,6 +26,7 @@ if modpaths is not None :
     for path in modpaths.split(";"):
         sys.path.append(path)
 import bo_helper
+from localizer import Localizer 
 ##################################################################
 
 def exp_opmat(mat,dt):
@@ -228,21 +229,15 @@ funcswitcher = {
 ##################################################################
 # analysis based on MO-weighted dipole
 
-def dipoleanalysis(dipole,dmat,nocc,occlist,virtlist,debug=False,HL=False):
+def dipoleanalysis(dipole,dmat,nocc,occlist,virtlist,debug=False):
     #virtlist can also contain occupied orbitals !check
-    #just HOMO-LUMO vertical transition
     tot = len(occlist)*len(virtlist)
-    if HL:
-      i = nocc
-      a = nocc+1
-      res = dipole[i-1,a-1]*dmat[a-1,i-1] + dipole[a-1,i-1]*dmat[i-1,a-1]
-    else:
-      res = np.zeros(tot,dtype=np.complex128)
-      count = 0
-      for i in occlist:
-        for j in virtlist:
-           res[count] = dipole[i-1,j-1]*dmat[j-1,i-1] + dipole[j-1,i-1]*dmat[i-1,j-1]
-           count +=1
+    res = np.zeros(tot,dtype=np.complex128)
+    count = 0
+    for i in occlist:
+      for j in virtlist:
+         res[count] = dipole[i-1,j-1]*dmat[j-1,i-1] + dipole[j-1,i-1]*dmat[i-1,j-1]
+         count +=1
     return res
 ##################################################################
 def dipole_selection(dipole,idlist,nocc,occlist,virtlist,odbg=sys.stderr,debug=False):
@@ -456,12 +451,18 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
     print("in BO basis C^T Stilde C = 1 : %s" % np.allclose(test,np.eye(C.shape[0])))
 
     if local_basis:
+            
+            try :
+              SAA_inv=np.linalg.inv(Stilde[:nbf_A,:nbf_A])
+            except scipy.linalg.LinAlgError:
+              print("Error in np.linalg.inv")
+
             localbas=Localizer(Dtilde,np.array(Stilde),nbf_A)
             localbas.localize()
             #unsorted orbitals
             unsorted_orbs=localbas.make_orbitals()
             #the projector P
-            Phat=np.matmul(Stilde.np[:,:nbf_A],np.matmul(S11_inv,Stilde.np[:nbf_A,:]))
+            Phat=np.matmul(Stilde[:,:nbf_A],np.matmul(SAA_inv,Stilde[:nbf_A,:]))
             #The RLMO are ordered
             # by descending value of the locality parameter.
             sorted_orbs = localbas.sort_orbitals(Phat)
@@ -642,7 +643,7 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
         virtlist=[]
         for m in range(ndocc,numbas):
             virtlist.append(m+1)
-      res = dipoleanalysis(dipmo_mat,Dp_0,ndocc,occlist,virtlist,debug,HL)
+      res = dipoleanalysis(dipmo_mat,Dp_0,ndocc,occlist,virtlist,debug)
       weighted_dip.append(res)
 
     fock_mid_backwd=np.copy(fock_mid_init) #prepare the fock at the previous midpint
@@ -720,7 +721,7 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
 
         if (do_weighted == -2):
           #weighted dipole 
-          res = dipoleanalysis(dipmo_mat,Dp_ti,ndocc,occlist,virtlist,debug,HL)
+          res = dipoleanalysis(dipmo_mat,Dp_ti,ndocc,occlist,virtlist,debug)
           weighted_dip.append(res)
         #Energy expectation value at t = t_i 
         ene_list.append(Eh_i + Exclow_i + ExcAAhigh_i -ExcAAlow_i + Enuc + 2.0*np.trace(np.matmul(D_ti,Htilde)) )
