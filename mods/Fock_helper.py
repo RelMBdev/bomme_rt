@@ -364,7 +364,7 @@ class fock_factory():
           #else:
           #    Dmat = np.matmul(Cocc,np.conjugate(Cocc.T))
           Vxc = self.get_xcpot(self.__func,self.__basis,Dmat,Cocc,return_ene=return_ene)
-          J = self.J(Cocc,Dmat.real)
+          J = self.J(Cocc,Dmat)
           if return_ene:
              # if return_ene=True in get_xcpot() a tuple will be returned
              res = self.__Hcore +2.0*J +Vxc[0]
@@ -405,7 +405,7 @@ class fock_factory():
           Cocc_ao = np.matmul(self.__U,Cocc)
 
           Vxc = self.get_xcpot(self.__func,self.__basis,Dmat_ao,Cocc_ao,return_ene=return_ene)
-          J = self.J(Cocc_ao,Dmat_ao.real)
+          J = self.J(Cocc_ao,Dmat_ao)
           # ao/bo subscript omitted when the basis used to express a given quantity 
           # can be inferred from the context
 
@@ -424,7 +424,7 @@ class fock_factory():
              Eh = 2.00*np.trace( np.matmul(J,Dmat_ao) )
              return Eh, Vxc[1], VxcAA_low[1], VxcAA_high[1], res
           else:
-             res = H_bo +2.0*J_bo +Vxc[0]+ VxcAA_high[0] - VxcAA_low[0]
+             res = H_bo +2.0*J_bo +Vxc+ VxcAA_high - VxcAA_low
              return res
     
     def __del__(self):

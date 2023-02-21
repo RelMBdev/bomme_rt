@@ -12,8 +12,8 @@ if modpaths is not None :
 from scf_run import run
 from init_run import initialize
 
-bset,bsetH, molelecule_str, psi4mol, wfn = initialize(False,'direct','3-21G','3-21G','H2O1.xyz',\
-                   'H2O2.xyz','hf','hf',0)
+bset,bsetH, molelecule_str, psi4mol, wfn = initialize(False,'direct','3-21G','3-21G','../examples/2h2o/H2O1.xyz',\
+                   '../examples/2h2o/H2O2.xyz','hf','hf',0)
 
 mints = psi4.core.MintsHelper(bset)
 
@@ -72,22 +72,29 @@ xchf= fock_factory.get_xcpot(fockbase,'hf',bset,Cocc=Cocc)
 test = np.allclose(Ktest,-1.0*xchf,atol=1.0e-12)
 print("TEST K(get_xcpot) mtx : PASSED ... %s\n" % test)
 
-"""
-print("trying GGA/Hybrid")
-bset,bsetH, molelecule_str, psi4mol, wfn = initialize(False,'direct','3-21G','3-21G','H2O1.xyz',\
-                   'H2O2.xyz','hf','hf',0)
-#refresh orbitals
-Cocc = np.array(wfn.Ca_subset('AO','OCC'))
-Vxc_mat = fock_factory.get_xcpot(fockbase,'hf',bset,Cocc=Cocc)
 
+print("trying GGA/Hybrid")
+func = 'b3lyp'
+bset,bsetH, molelecule_str, psi4mol, wfn = initialize(False,'direct','3-21G','3-21G','../examples/2h2o/H2O1.xyz',\
+                   '../examples/2h2o/H2O2.xyz',func,func,0)
+#refresh orbital and fockbase
+Cocc = np.array(wfn.Ca_subset('AO','OCC'))
+fockbase = fock_factory(testjk,H,S,funcname=func,basisobj=bset)
+Vxc_mat = fock_factory.get_xcpot(fockbase,func,bset,Cocc=Cocc)
+
+if func == 'hf':
+  test = np.allclose(Ktest,-1.0*Vxc_mat,atol=1.0e-12)
+  print("TEST Vxc_mat) mtx : PASSED ... %s\n" % test)
+#refresh J
+J = testjk.J(Cocc,np.array(wfn.Da()))
  
 Test_H = H +2.00*J +Vxc_mat
 
 test = np.allclose(np.array(wfn.Fa()),Test_H,atol=1.0e-12)
-print("test GGA/hybrid Fock: Passed .... %s\n" % test)
+print("test GGA/hybrid Fock (sum of term): Passed .... %s\n" % test)
 
 print("compute full fock straight away..")
 Fnew = fockbase.get_Fock(Cocc)
-test = np.allclose(np.array(wfn.Fa()),Fnew,atol=1.0e-12)
+test = np.allclose(Test_H,Fnew,atol=1.0e-12)
 print("test GGA/hybrid gen Fock: Passed .... %s\n" % test)
-"""
+
