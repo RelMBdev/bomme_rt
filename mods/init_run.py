@@ -9,32 +9,34 @@ if modpaths is not None :
     for path in modpaths.split(";"):
         sys.path.append(path)
 
-from molecule import Molecule
+from molecule import Molecule, gparser
 
-def initialize(jkflag,scf_type,obs1,obs2,geomA,geomB,func1,func2,\
+def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
                 charge):
     if (not jkflag) and (not scf_type == 'direct'):
         raise Exception("Bad keyword combination: scf_type and jkclass mode \n")
 
     acc_bset = obs1
     gen_bset = obs2
-
+    
 
     #orblist = molist.split(";")
     #orblist = [int(m) for m in molist]
 
-    fgeomA = geomA
-    fgeomB = geomB
+
     func_l=func2
     func_h=func1
     print("High Level functional : %s\n" % func_h)
     print("Low Level functional : %s\n" % func_l)
     print("Low Level basis : %s\n" % gen_bset)
     print("High Level basis : %s\n" % acc_bset)
-
-
-    moltot = Molecule(fgeomA,label=True)
+    
+    # corestr is a string containing only the 'high-level-theory' subsys
+    speclist, geomstr, corestr, natom1 = gparser(fgeom)
+    
+    moltot = Molecule()
     moltot.set_charge(charge)
+    moltot.geom_from_string(geomstr)
 
     psi4.set_memory('2 GB')
 
@@ -44,19 +46,13 @@ def initialize(jkflag,scf_type,obs1,obs2,geomA,geomB,func1,func2,\
     # nuclear repulsione energy of subsys A
 
 
-
-    speclist = moltot.labels()
-
-    molB = Molecule(fgeomB)
-
-    #moltot has been augmented by molecule B geometry
-    moltot.append(molB.geometry())
-
     #append some options, we can also include total charge (q) and multiplicity (S) of the total system
     moltot.append("symmetry c1" + "\n" + "no_reorient" + "\n" + "no_com")
     moltot.display_xyz()
-
-    molA = Molecule(fgeomA)
+    
+    # used in fragment A basis definition, see below
+    molA = Molecule()
+    molA.geom_from_string(corestr,natom1)
 
     #molA.display_xyz()
     #molB.display_xyz()
@@ -79,6 +75,7 @@ def initialize(jkflag,scf_type,obs1,obs2,geomA,geomB,func1,func2,\
     L=[4.5,4.5,4.5]
     Dx=[0.15,0.15,0.15]
 
+    psi4.core.set_output_file('psi4.out', False)
     psi4.set_options({'basis': 'userdefined',
                       'puream': 'True',
                       'DF_SCF_GUESS': 'False',
@@ -146,8 +143,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-gA","--geomA", help="Specify geometry file for the subsystem A", required=True,    
             type=str, default="XYZ")
-    parser.add_argument("-gB","--geomB", help="Specify geometry file for the subsystem B", required=True, 
-            type=str, default="XYZ")
+    #parser.add_argument("-gB","--geomB", help="Specify geometry file for the subsystem B", required=True, 
+    #        type=str, default="XYZ")
     parser.add_argument("-d", "--debug", help="Debug on, prints debug info to err.txt", required=False,
             default=False, action="store_true")
 
@@ -174,4 +171,4 @@ if __name__ == "__main__":
 
     
     bset,bsetH,moltot,psi4mol,wfn = initialize(args.jkclass,args.scf_type,args.obs1,args.obs2,args.geomA,\
-                   args.geomB,args.func1,args.func2,args.charge)
+                   args.func1,args.func2,args.charge)

@@ -18,16 +18,40 @@ def set_input(fgeom):
   return geomobj, mol,numat,species
 
 
+def gparser(fname):
+      listatom = []
+      geometry=str()
+      coregeom = str()
+      fflag = False
+      with open(fname,'r') as data:
+         natom = int(data.readline()) # natom of active + frag
+                                           
+    
+         next(data)      
+         for line in data:
+             tmp = line.strip()
+             if tmp != '-frag-' and not fflag: 
+               listatom.append(str(tmp.split()[0]) +'1')   
+               coregeom+=str(tmp)+'\n'
+               geometry+= str(tmp.split()[0]) +'1' + '   ' + str(tmp.split()[1])  + '   ' + str(tmp.split()[2]) + '   ' + str(tmp.split()[3])+'\n'
+             elif tmp == '-frag-': 
+               fflag = True
+             else:
+               geometry+=str(tmp)+'\n'
+      tmplist = list(dict.fromkeys(listatom))
+      return tmplist, geometry, coregeom, natom 
+
 class Molecule():
 
-  def __init__(self,fgeom='geom.xyz',label=False):
+  def __init__(self,fgeom=None,label=False):
 
       self.__geometry = None
       self.__natom = None
       self.__labels = None
       self.__status_on = None
-      self.set_geometry(fgeom,label)
-      self.get_labels(fgeom,label)
+      if fgeom is not None:
+         self.set_geometry(fgeom,label)
+         self.get_labels(fgeom,label)
 
   def set_geometry(self,fgeom,label=False):
 
@@ -61,6 +85,13 @@ class Molecule():
              self.__labels.append(tmp[0])
          self.__labels = list(dict.fromkeys(self.__labels))
 
+  def geom_from_string(self,geomstr,natom=None):
+      self.__natom = natom
+      if self.__geometry is None:
+         self.__geometry = geomstr
+      else:
+         self.__geometry += geomstr
+
   def get_ghost(self,idx1,idx0=0):
       gdummy = str()
       tmp=self.__geometry.split('\n')
@@ -74,7 +105,10 @@ class Molecule():
       self.__geometry += options
 
   def set_charge(self,charge,mult=1):
-      self.__geometry+=str(charge)+' '+str(mult) + '\n'
+      if self.__geometry is None:
+         self.__geometry=str(charge)+' '+str(mult) + '\n'
+      else:
+         self.__geometry+=str(charge)+' '+str(mult) + '\n'
 
   def display_xyz(self):
       print(self.__geometry)

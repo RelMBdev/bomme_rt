@@ -12,8 +12,8 @@ if modpaths is not None :
 from scf_run import run
 from init_run import initialize
 
-bset,bsetH, molelecule_str, psi4mol, wfn = initialize(False,'direct','3-21G','3-21G','../examples/2h2o/H2O1.xyz',\
-                   '../examples/2h2o/H2O2.xyz','hf','hf',0)
+bset,bsetH, molelecule_str, psi4mol, wfn = initialize(False,'direct','3-21G','3-21G','H2O1.xyz',\
+                   'hf','hf',0)
 
 mints = psi4.core.MintsHelper(bset)
 
@@ -45,7 +45,7 @@ I = np.array(mints.ao_eri())
 
 from Fock_helper import jkfactory
 
-testjk =jkfactory(bset,psi4mol,jknative=True,eri=I)
+testjk =jkfactory(bset,psi4mol,jknative=True,eri=None)
 
 Cocc = np.array(wfn.Ca_subset('AO','OCC'))
 J = testjk.J(Cocc,np.array(wfn.Da()))
@@ -75,8 +75,8 @@ print("TEST K(get_xcpot) mtx : PASSED ... %s\n" % test)
 
 print("trying GGA/Hybrid")
 func = 'b3lyp'
-bset,bsetH, molelecule_str, psi4mol, wfn = initialize(False,'direct','3-21G','3-21G','../examples/2h2o/H2O1.xyz',\
-                   '../examples/2h2o/H2O2.xyz',func,func,0)
+bset,bsetH, molelecule_str, psi4mol, wfn = initialize(False,'direct','3-21G','3-21G','H2O1.xyz',\
+                   func,func,0)
 #refresh orbital and fockbase
 Cocc = np.array(wfn.Ca_subset('AO','OCC'))
 fockbase = fock_factory(testjk,H,S,funcname=func,basisobj=bset)
@@ -98,3 +98,47 @@ Fnew = fockbase.get_Fock(Cocc)
 test = np.allclose(Test_H,Fnew,atol=1.0e-12)
 print("test GGA/hybrid gen Fock: Passed .... %s\n" % test)
 
+
+print("test mixed basis / functionals")
+func_high = 'b3lyp'
+func_low = 'b3lyp'
+bset,bsetH, molelecule_str, psi4mol, wfn = initialize(False,'direct','3-21G','3-21G','H2O1.xyz',\
+                   func_high,func_low,0)
+
+mints = psi4.core.MintsHelper(bset)
+
+H = np.array(mints.ao_kinetic())+ np.array(mints.ao_potential())
+S = np.array(mints.ao_overlap())
+numbas = bset.nbf()
+
+nbfA = bsetH.nbf()
+
+#make U matrix for blend basis(cc-pvdz+3-21G)
+U = np.eye(numbas)
+S11=S[:nbfA,:nbfA]
+S11_inv=np.linalg.inv(S11)
+S12 =S[:nbfA,nbfA:]
+P=np.matmul(S11_inv,S12)
+U[:nbfA,nbfA:]=-1.0*P
+
+#S block orthogonal
+Stilde= np.matmul(U.T,np.matmul(S,U))
+testjk =jkfactory(bset,psi4mol,jknative=True,eri=None)
+#refresh orbital and fockbase
+Cocc = np.array(wfn.Ca_subset('AO','OCC'))
+
+try:
+    U_inv = np.linalg.inv(U)
+except np.linalg.LinAlgError:
+    print("Error in numpy.linalg.inv of inputted matrix")
+
+Cocc = np.matmul(U_inv,Cocc)
+
+fockbase = fock_factory(testjk,H,S,funcname=func_low,basisobj=bset)
+F_bblock = fockbase.get_bblock_Fock(Cocc,func_acc=func_high,basis_acc=bsetH,U=U)
+
+print("F(BO) dim: %i,%i\n" % (F_bblock.shape[0],F_bblock.shape[1]))
+Test_H = np.matmul(U.T,np.matmul(Test_H,U))
+
+test = np.allclose(F_bblock,Test_H,atol=1.0e-12)
+print("test GGA/hybrid Fock Block-Orth.: Passed .... %s\n" % test)

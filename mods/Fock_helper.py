@@ -256,7 +256,7 @@ class fock_factory():
           if isinstance(U,np.ndarray):
              res = np.matmul(U.T,np.matmul(res,U))
           return res
-    def get_xcpot(self,func,bset,Dmat=None,Cocc=None,exmodel=0,U=None,return_ene=False):
+    def get_xcpot(self,func,bset,Dmat=None,Cocc=None,exmodel=0,return_ene=False):
           # exmodel = 0 and basis=basis_total make the Vxc coincide with the standard supermolecular Vxc matrix
           # basis denote the basis in which the final Fock mtx 
           # will be expressed (total basis or fragment basis)
@@ -334,10 +334,6 @@ class fock_factory():
                   ExcAAhigh += -alpha*np.trace(np.matmul(Dmat[:nbf,:nbf],K))
                dft_pot.clean() #clean
                del dft_pot
-          if isinstance(U,np.ndarray):
-             # transform to the block-orthogonalized basis. Bomme-wise, this is done only for the
-             # low-level region fock
-             VxcAAhigh = np.matmul(U.T,np.matmul(VxcAAhigh,U))
           if return_ene:
 
              return VxcAAhigh, ExcAAhigh
@@ -377,7 +373,7 @@ class fock_factory():
     # a cleaner implementation of the block-orthogonalized Fock
     # for ground state, only the orbital should be provided.
     # basis_acc is the basis set of the small high-level-theory subsys 
-    def get_bblock_Fock(self,Cocc=None,Dmat=None,func_acc=None,basis_acc=None,return_ene=False):
+    def get_bblock_Fock(self,Cocc=None,Dmat=None,func_acc=None,basis_acc=None,U=None,return_ene=False):
           # Dmat & Cocc are provided in the block-orthogonalized basis (BO)
           if (not isinstance(Cocc, np.ndarray)) and (not isinstance(Dmat, np.ndarray)):
               raise Exception("Cocc and D are both None")
@@ -396,20 +392,23 @@ class fock_factory():
           #    print("check dmat real: %s\n" % np.allclose(Dmat.real,test_dmat))
           #    print(np.linalg.norm(np.abs(Dmat.real-test_dmat),'fro'))
           
-          if not isintance(self.__U,np.ndarray):
+          if not isinstance(U,np.ndarray):
              raise TypeError("U must be np.ndarray")
           
           # the two-electron part corresponding to the low-level theory (on the full Dmat/basis)
           # get Dmat/Cocc in the AO basis
-          Dmat_ao = np.matmul(self.__U,np.matmul(Dmat,U.T)) 
-          Cocc_ao = np.matmul(self.__U,Cocc)
+          if isinstance(Dmat, np.ndarray):
+             Dmat_ao = np.matmul(U,np.matmul(Dmat,U.T)) 
+          else:
+             Dmat_ao = None
+
+          Cocc_ao = np.matmul(U,Cocc)
 
           Vxc = self.get_xcpot(self.__func,self.__basis,Dmat_ao,Cocc_ao,return_ene=return_ene)
           J = self.J(Cocc_ao,Dmat_ao)
           # ao/bo subscript omitted when the basis used to express a given quantity 
           # can be inferred from the context
-
-          J_bo = np.amtmul(U.T,np.matmul(J,U))
+          
           H_bo = np.matmul(U.T,np.matmul(self.__Hcore,U))
  
           # the two-electron part corresponding to the low-level-theory calculated on D_AA
@@ -418,13 +417,24 @@ class fock_factory():
           # the two-electron part corresponding to the high-level-theory subsys (on D_AA)
           VxcAA_high = self.get_xcpot(func_acc,basis_acc,Dmat,Cocc,return_ene=return_ene)
           
+          tmp=np.zeros( (self.__basis.nbf(),self.__basis.nbf()) )
           if return_ene:
              # if return_ene=True in get_xcpot() a tuple will be returned
-             res = H_bo +2.0*J_bo +Vxc[0]+ VxcAA_high[0] - VxcAA_low[0]
+             tmp[:basis_acc.nbf(),:basis_acc.nbf()] = VxcAA_high[0] - VxcAA_low[0]
+
+             # two_el_bo is the two-electron term (J+Vxc) expressed on the BO basis
+             two_el_bo = np.matmul(U.T,np.matmul( ( 2.0*J+Vxc[0] ),U))
+             
+             res = H_bo + two_el_bo + tmp
              Eh = 2.00*np.trace( np.matmul(J,Dmat_ao) )
              return Eh, Vxc[1], VxcAA_low[1], VxcAA_high[1], res
           else:
-             res = H_bo +2.0*J_bo +Vxc+ VxcAA_high - VxcAA_low
+             tmp[:basis_acc.nbf(),:basis_acc.nbf()] = VxcAA_high - VxcAA_low
+
+             # two_el_bo is the two-electron term (J+Vxc) expressed on the BO basis
+             two_el_bo = np.matmul(U.T,np.matmul( ( 2.0*J+Vxc ),U))
+             
+             res = H_bo + two_el_bo + tmp
              return res
     
     def __del__(self):
