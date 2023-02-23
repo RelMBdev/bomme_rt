@@ -60,8 +60,13 @@ class jkfactory():
         if (eri is not None):
             print("doing tensor contraction")
             self.__eri_axis  = len(eri.shape)
+
     def eri(self):
         return self.__eri
+
+    def set_rt_Kfit(self):
+        self.__rtfit = True
+
     def J(self,Cocc,Dmat=None,sum_idx=None,out=None):#Dmat and Cocc are expressed on the Ao basis
            nbf = self.__basisobj.nbf()  # C/Den matrix passed in full dimension, slicing 
                                         # if needed is carried out afterwards

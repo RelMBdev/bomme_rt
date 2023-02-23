@@ -12,7 +12,7 @@ if modpaths is not None :
 from scf_run import run
 from init_run import initialize
 
-bset,bsetH, molelecule_str, psi4mol, wfn = initialize(False,'direct','3-21G','3-21G','H2O1.xyz',\
+bset,bsetH, molelecule_str, psi4mol, wfn, jkobj = initialize(False,'direct','3-21G','3-21G','H2O1.xyz',\
                    'hf','hf',0)
 
 mints = psi4.core.MintsHelper(bset)
@@ -75,7 +75,7 @@ print("TEST K(get_xcpot) mtx : PASSED ... %s\n" % test)
 
 print("trying GGA/Hybrid")
 func = 'b3lyp'
-bset,bsetH, molelecule_str, psi4mol, wfn = initialize(False,'direct','3-21G','3-21G','H2O1.xyz',\
+bset,bsetH, molelecule_str, psi4mol, wfn, jkobj = initialize(False,'direct','3-21G','3-21G','H2O1.xyz',\
                    func,func,0)
 #refresh orbital and fockbase
 Cocc = np.array(wfn.Ca_subset('AO','OCC'))
@@ -102,7 +102,7 @@ print("test GGA/hybrid gen Fock: Passed .... %s\n" % test)
 print("test mixed basis / functionals")
 func_high = 'b3lyp'
 func_low = 'b3lyp'
-bset,bsetH, molelecule_str, psi4mol, wfn = initialize(False,'direct','3-21G','3-21G','H2O1.xyz',\
+bset,bsetH, molelecule_str, psi4mol, wfn, jkobj = initialize(False,'direct','3-21G','3-21G','H2O1.xyz',\
                    func_high,func_low,0)
 
 mints = psi4.core.MintsHelper(bset)

@@ -12,7 +12,7 @@ if modpaths is not None :
 from molecule import Molecule, gparser
 
 def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
-                charge):
+                charge,numpy_memory=8,eri=None):
     if (not jkflag) and (not scf_type == 'direct'):
         raise Exception("Bad keyword combination: scf_type and jkclass mode \n")
 
@@ -130,7 +130,62 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
     
     print("functions in subsys1: %i" % nbfA)
 
-    return bset,bsetH, moltot,molobj,wfn
+    mints = psi4.core.MintsHelper(bset)
+    if eri=='nofit':
+       # Run a quick check to make sure everything will fit into memory
+       I_Size = (numbas**4) * 8.e-9
+       print("\nSize of the ERI tensor will be %4.2f GB." % I_Size)
+       
+       # Estimate memory usage
+       memory_footprint = I_Size * 1.5
+       if I_Size > numpy_memory:
+           psi4.core.clean()
+           raise Exception("Estimated memory utilization (%4.2f GB) exceeds numpy_memory limit of %4.2f GB." % (memory_footprint, numpy_memory))
+       #Get Eri (2-electron repulsion integrals)
+       eri=np.array(mints.ao_eri())
+       print("eri n. axis: %i" % len(eri.shape))
+    elif eri=='fit':
+           
+          aux_basis = psi4.core.BasisSet.build(molobj, "DF_BASIS_SCF", "", "JKFIT", psi4.core.get_global_option('basis'))
+          n_aux = aux_basis.nbf()
+
+          # Run a quick check to make sure everything will fit into memory
+          #3-index ERIs, dimension (1, Naux, nbf, nbf)
+          Q_Size = (n_aux*numbas*2) * 8.e-9
+          print("\nSize of the 3-index ERI tensor will be %4.2f GB." % Q_Size)
+
+          # Estimate memory usage
+          memory_footprint = Q_Size * 1.5
+          if Q_Size > numpy_memory:
+              psi4.core.clean()
+              raise Exception("Estimated memory utilization (%4.2f GB) " +\
+                      "exceeds numpy_memory limit of %4.2f GB." % (memory_footprint, numpy_memory))
+
+          #dummy zero basis
+          zero_bas = psi4.core.BasisSet.zero_ao_basis_set() 
+          bset = mol_wfn.basisset()
+          Ppq = mints.ao_eri(aux_basis, zero_bas, bset,bset)
+
+          # Build and invert the metric
+          metric = mints.ao_eri(aux_basis, zero_bas, aux_basis, zero_bas)
+          metric.power(-0.5, 1.e-14)
+
+          # Remove the excess dimensions of Ppq & metric
+          Ppq = np.squeeze(Ppq)
+          metric = np.squeeze(metric)
+
+          # Contract Ppq & Metric to build Qpq
+          eri = np.einsum('QP,Ppq->Qpq', metric, Ppq)
+          print("eri shape [%i,%i,%i]" % (eri.shape[0],eri.shape[1],eri.shape[2]))
+          print("eri n. axis: %i" % len(eri.shape))
+    else:
+          eri = None
+    
+    print("eri is instance: %s\n" % type(eri)) 
+    from Fock_helper import jkfactory
+    jkbase = jkfactory(bset,molobj,jkflag,scf_type,eri=eri)
+
+    return bset,bsetH, moltot,molobj,wfn,jkbase
 
 ####################################################################################
 
@@ -170,5 +225,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     
-    bset,bsetH,moltot,psi4mol,wfn = initialize(args.jkclass,args.scf_type,args.obs1,args.obs2,args.geomA,\
+    bset,bsetH,moltot,psi4mol,wfn, jkbase = initialize(args.jkclass,args.scf_type,args.obs1,args.obs2,args.geomA,\
                    args.func1,args.func2,args.charge)

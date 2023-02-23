@@ -22,8 +22,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-gA","--geomA", help="Specify geometry file for the subsystem A", required=True,    
             type=str, default="XYZ")
-    parser.add_argument("-gB","--geomB", help="Specify geometry file for the subsystem B", required=True, 
-            type=str, default="XYZ")
+    #parser.add_argument("-gB","--geomB", help="Specify geometry file for the subsystem B", required=True, 
+    #        type=str, default="XYZ")
     parser.add_argument("-d", "--debug", help="Debug on, prints debug info to err.txt", required=False,
             default=False, action="store_true")
 
@@ -76,8 +76,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # call functions here    
-    bset,bsetH, molelecule_str, psi4mol, wfn = initialize(args.jkclass,args.scf_type,args.obs1,args.obs2,args.geomA,\
-                   args.geomB,args.func1,args.func2,args.charge)
+    bset,bsetH, molelecule_str, psi4mol, wfn, jkbase = initialize(args.jkclass,args.scf_type,args.obs1,args.obs2,args.geomA,\
+                   args.func1,args.func2,args.charge)
 
 
     res, wfnBO = run(args.jkclass,args.scf_type,psi4mol,bset,bsetH,args.guess,args.func1,args.func2,args.exmodel,wfn,args.numpy_mem)
