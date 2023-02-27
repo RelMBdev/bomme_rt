@@ -184,7 +184,7 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
           print("eri shape [%i,%i,%i]" % (eri.shape[0],eri.shape[1],eri.shape[2]))
           print("eri n. axis: %i" % len(eri.shape))
     else:
-          print("invalid keyworld, using native psi4 JK class")
+          print("invalid keyword, using native psi4 JK class")
           eri = None
     
     print("eri is instance: %s\n" % type(eri)) 
