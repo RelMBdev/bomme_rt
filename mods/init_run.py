@@ -1,6 +1,7 @@
 import os
 import sys
 import psi4
+import numpy as np
 
 sys.path.insert(0, "../common")
 modpaths = os.environ.get('COMMON_PATH')
@@ -12,10 +13,12 @@ if modpaths is not None :
 from molecule import Molecule, gparser
 
 def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
-                charge,numpy_memory=8,eri=None):
-    if (not jkflag) and (not scf_type == 'direct'):
-        raise Exception("Bad keyword combination: scf_type and jkclass mode \n")
-
+                charge,numpy_memory=8,eri=None,fitt_Krt=False):
+    #if (not jkflag) and (not scf_type == 'DIRECT'):
+    #    raise Exception("Bad keyword combination: scf_type and jkclass mode \n")
+    # scf_type controls the type of scf type in the initialization (the GS density
+    # is optionally used as guess density) and the type of J (K) matrix ('direct',
+    # 'mem_df', 'disk_df', 'pk' integrals)
     acc_bset = obs1
     gen_bset = obs2
     
@@ -116,7 +119,7 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
     print("Number of shells of the total AB basis:  %i" % numshell)
     numbas=bset.nbf()
     print("Number of functions of the total AB basis:  %i" % numbas)
-    natoms=molobj.natom()
+    #natoms=molobj.natom()
     #the basis set object for the high level portion
     bsetH=psi4.core.BasisSet.build(mHigh,'ORBITAL',acc_bset,puream=-1)
 
@@ -131,6 +134,8 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
     print("functions in subsys1: %i" % nbfA)
 
     mints = psi4.core.MintsHelper(bset)
+    if (eri != 'fit') and (fitt_Krt):
+        raise Exception("Fitted K imag-part required -> fit eri \n")
     if eri=='nofit':
        # Run a quick check to make sure everything will fit into memory
        I_Size = (numbas**4) * 8.e-9
@@ -163,7 +168,7 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
 
           #dummy zero basis
           zero_bas = psi4.core.BasisSet.zero_ao_basis_set() 
-          bset = mol_wfn.basisset()
+          #bset = wfn.basisset() already defined
           Ppq = mints.ao_eri(aux_basis, zero_bas, bset,bset)
 
           # Build and invert the metric
@@ -179,6 +184,7 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
           print("eri shape [%i,%i,%i]" % (eri.shape[0],eri.shape[1],eri.shape[2]))
           print("eri n. axis: %i" % len(eri.shape))
     else:
+          print("invalid keyworld, using native psi4 JK class")
           eri = None
     
     print("eri is instance: %s\n" % type(eri)) 

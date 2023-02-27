@@ -59,13 +59,14 @@ class jkfactory():
 
         if (eri is not None):
             print("doing tensor contraction")
+            if self.__jkflag:
+                print("JK psi4 class being in use!!")
             self.__eri_axis  = len(eri.shape)
 
     def eri(self):
         return self.__eri
-
-    def set_rt_Kfit(self):
-        self.__rtfit = True
+    def is_native(self):
+        return self.__jkflag
 
     def J(self,Cocc,Dmat=None,sum_idx=None,out=None):#Dmat and Cocc are expressed on the Ao basis
            nbf = self.__basisobj.nbf()  # C/Den matrix passed in full dimension, slicing 
@@ -92,6 +93,17 @@ class jkfactory():
                  
                  for subel in elm:
                     idx.append(subel)                    
+           else:
+             Idx = []
+             idx = []
+             for elm in sum_idx:
+                 
+                 for subel in elm:
+                    Idx.append(subel)
+             for elm in out:
+                 
+                 for subel in elm:
+                    idx.append(subel)
            if self.__jkflag :
               if not isinstance(Cocc,np.ndarray):
                  raise Exception("Cocc is not np.ndarray")
@@ -138,6 +150,17 @@ class jkfactory():
                   
                   for subel in elm:
                      idx.append(subel)
+            else: # for general case, rarely needed
+              Idx = []
+              idx = []
+              for elm in sum_idx:
+                  
+                  for subel in elm:
+                     Idx.append(subel)
+              for elm in out:
+                  
+                  for subel in elm:
+                     idx.append(subel)
             #print(Idx)
             #print(idx)
             if self.__jkflag :
@@ -149,8 +172,8 @@ class jkfactory():
                Kmat=np.array(self.__jk.K()[0])[idx[0]:idx[1],idx[2]:idx[3]] #
                # the native jkclass will use real mol. orbital (nat orbitals of D.real) to compute K, neglecting
                # the imaginary part of D (D.imag)
-               if self.__rtfit:
-                  #print("debug: fitting the residual K.imag")
+               if self.__rtfit and np.iscomplexobj(Dmat) :
+                  # print("debug: fitting the residual K.imag")
                   if not (self.__eri_axis < 4):
                      raise Exception("need fitted 3-index tensor here") 
                   Z_Qqr = np.einsum('Qrs,sq->Qrq', self.__eri[:,idx[2]:idx[3],Idx[2]:Idx[3]], (Dmat.imag)[Idx[0]:Idx[1],Idx[2]:Idx[3]])
@@ -228,12 +251,13 @@ class dft_xc():
         return alpha
 
 class fock_factory():
-    def __init__(self,jk_fact,Hmat,ovapm,funcname=None,basisobj=None):
+    def __init__(self,jk_fact,Hmat,ovapm,funcname=None,basisobj=None,exmodel=0):
           self.__supfunc = None
           self.__Hcore = Hmat
           self.__S = ovapm
           self.__basis = basisobj
           self.__func = funcname
+          self.__exmodel = exmodel
           self.__restricted = True #default
           #self.__basis_h = None # the basis of the 'high-level' subsys
           self.__jkfact = jk_fact
@@ -248,15 +272,11 @@ class fock_factory():
         return self.__basis
 
     def J(self,Cocc,Dmat=None,sum_str=None,out=None,U=None):
-          if not isinstance(Cocc,np.ndarray):
-              raise TypeError("Cocc must be np.ndarray")
           res = self.__jkfact.J(Cocc,Dmat,sum_str,out)
           if isinstance(U,np.ndarray):
              res = np.matmul(U.T,np.matmul(res,U))
           return res
     def K(self,Cocc,Dmat=None,sum_str=None,out=None,U=None):
-          if not isinstance(Cocc,np.ndarray):
-              raise TypeError("Cocc must be np.ndarray")
           res = self.__jkfact.K(Cocc,Dmat,sum_str,out)
           if isinstance(U,np.ndarray):
              res = np.matmul(U.T,np.matmul(res,U))
@@ -271,11 +291,12 @@ class fock_factory():
           nbf = bset.nbf()
           # the basis set could either fragment (A or B) basis or total basis (A U B)        
           if func=='hf':
-             if not isinstance(Cocc, np.ndarray):
-                TypeError("Cocc: input must be np.ndarray")
+             if isinstance(Cocc, np.ndarray):
                 
-             Cocc_A=np.zeros_like(Cocc)
-             Cocc_A[:nbf,:]=np.asarray(Cocc)[:nbf,:]
+                Cocc_A=np.zeros_like(Cocc)
+                Cocc_A[:nbf,:]=np.asarray(Cocc)[:nbf,:]
+             else:
+                Cocc_A = None
                 
              #DEBUG
              #check=np.matmul(Cocc_A,Cocc_A.T)
@@ -283,7 +304,7 @@ class fock_factory():
              
              
         
-             K = self.__jkfact.K(Cocc_A,Dmat,sum_idx=[[0,nbf],[0,nbf]],out=[[0,nbf],[0,nbf]])    #assuming Exc0 model?
+             K = self.__jkfact.K(Cocc_A,Dmat,out=[[0,nbf],[0,nbf]])    #assuming Exc0 model?
              #Exc_ex0 =  -np.trace(np.matmul(Dbo.np[:na,:na],K))
              #print("ExceAAhigh EX0 mod: %.10e\n" % Exc_ex0)
              #exchange model 1
@@ -314,11 +335,14 @@ class fock_factory():
              
                if dft_pot.is_x_hybrid():
                   alpha = dft_pot.x_alpha()
-                  Cocc_A=np.zeros_like(Cocc)
-                  Cocc_A[:nbf,:]=np.asarray(Cocc)[:nbf,:]
+                  if  isinstance(Cocc,np.ndarray):
+                      Cocc_A=np.zeros_like(Cocc)
+                      Cocc_A[:nbf,:]=np.asarray(Cocc)[:nbf,:]
+                  else:
+                      Cocc_A = None
                
                
-                  K = self.__jkfact.K(Cocc_A,out=[[0,nbf],[0,nbf]])    
+                  K = self.__jkfact.K(Cocc_A,Dmat,out=[[0,nbf],[0,nbf]])    
                   if exmodel==1:
                       nlim = Dmat.shape[0]
                       if nbf >= nlim:
@@ -348,7 +372,7 @@ class fock_factory():
     def get_Fock(self,Cocc=None,Dmat=None,return_ene=False):
           if (not isinstance(Cocc, np.ndarray)) and (not isinstance(Dmat, np.ndarray)):
               raise Exception("Cocc and D are both None")
-          elif not isinstance(Cocc,np.ndarray):
+          elif not isinstance(Cocc,np.ndarray) and self.__jkfact.is_native():
                ndocc = int(np.rint(np.trace(np.matmul(Dmat,self.__S)).real))
                Cocc = np.zeros((Dmat.shape[0],ndocc))
  #             print(ndocc)
@@ -379,10 +403,13 @@ class fock_factory():
     # for ground state, only the orbital should be provided.
     # basis_acc is the basis set of the small high-level-theory subsys 
     def get_bblock_Fock(self,Cocc=None,Dmat=None,func_acc=None,basis_acc=None,U=None,return_ene=False):
+          if not isinstance(U,np.ndarray):
+             raise TypeError("U must be np.ndarray")
+
           # Dmat & Cocc are provided in the block-orthogonalized basis (BO)
           if (not isinstance(Cocc, np.ndarray)) and (not isinstance(Dmat, np.ndarray)):
               raise Exception("Cocc and D are both None")
-          elif not isinstance(Cocc,np.ndarray):
+          elif not isinstance(Cocc,np.ndarray) and self.__jkfact.is_native():
                ndocc = int(np.rint(np.trace(np.matmul(Dmat,self.__S)).real))
                Cocc = np.zeros((Dmat.shape[0],ndocc))
           #    print(ndocc)
@@ -393,22 +420,24 @@ class fock_factory():
                w = w[idx_w]
                v = v[:,idx_w]
                Cocc = v[:,:ndocc]
-          #    test_dmat =np.matmul(Cocc,Cocc.T)
-          #    print("check dmat real: %s\n" % np.allclose(Dmat.real,test_dmat))
-          #    print(np.linalg.norm(np.abs(Dmat.real-test_dmat),'fro'))
-          
-          if not isinstance(U,np.ndarray):
-             raise TypeError("U must be np.ndarray")
-          
+               #test_dmat =np.matmul(Cocc,Cocc.T)
+               #print("check dmat real: %s\n" % np.allclose(Dmat.real,test_dmat))
+               #print(np.linalg.norm(np.abs(Dmat.real-test_dmat),'fro'))
+                
+               Cocc_ao = np.matmul(U,Cocc)
+          elif (isinstance(Cocc, np.ndarray)):
+               Cocc_ao = np.matmul(U,Cocc)
+          else:
+               Cocc_ao = None
+           
           # the two-electron part corresponding to the low-level theory (on the full Dmat/basis)
           # get Dmat/Cocc in the AO basis
           if isinstance(Dmat, np.ndarray):
+             #print("Dmat is %s\n" % type(Dmat))
+             #print("Dmat dim : %i,%i\n" % Dmat.shape)
              Dmat_ao = np.matmul(U,np.matmul(Dmat,U.T)) 
           else:
              Dmat_ao = None
-
-          Cocc_ao = np.matmul(U,Cocc)
-
           Vxc = self.get_xcpot(self.__func,self.__basis,Dmat_ao,Cocc_ao,return_ene=return_ene)
           J = self.J(Cocc_ao,Dmat_ao)
           # ao/bo subscript omitted when the basis used to express a given quantity 
@@ -420,26 +449,29 @@ class fock_factory():
           VxcAA_low = self.get_xcpot(self.__func,basis_acc,Dmat,Cocc,return_ene=return_ene)
           
           # the two-electron part corresponding to the high-level-theory subsys (on D_AA)
-          VxcAA_high = self.get_xcpot(func_acc,basis_acc,Dmat,Cocc,return_ene=return_ene)
+          VxcAA_high = self.get_xcpot(func_acc,basis_acc,Dmat,Cocc,exmodel=self.__exmodel,return_ene=return_ene)
           
-          tmp=np.zeros( (self.__basis.nbf(),self.__basis.nbf()) )
+          if isinstance(Dmat_ao,np.ndarray):   
+             Eh = 2.00*np.trace( np.matmul(J,Dmat_ao) )
+          else:
+             Eh = 2.00*np.trace( np.matmul(Cocc_ao.T,np.matmul(J,Cocc_ao) ) )
+
           if return_ene:
              # if return_ene=True in get_xcpot() a tuple will be returned
-             tmp[:basis_acc.nbf(),:basis_acc.nbf()] = VxcAA_high[0] - VxcAA_low[0]
 
              # two_el_bo is the two-electron term (J+Vxc) expressed on the BO basis
              two_el_bo = np.matmul(U.T,np.matmul( ( 2.0*J+Vxc[0] ),U))
              
-             res = H_bo + two_el_bo + tmp
-             Eh = 2.00*np.trace( np.matmul(J,Dmat_ao) )
+             res = H_bo + two_el_bo 
+             res[:basis_acc.nbf(),:basis_acc.nbf()] += (VxcAA_high[0] - VxcAA_low[0])
              return Eh, Vxc[1], VxcAA_low[1], VxcAA_high[1], res
           else:
-             tmp[:basis_acc.nbf(),:basis_acc.nbf()] = VxcAA_high - VxcAA_low
 
              # two_el_bo is the two-electron term (J+Vxc) expressed on the BO basis
              two_el_bo = np.matmul(U.T,np.matmul( ( 2.0*J+Vxc ),U))
              
-             res = H_bo + two_el_bo + tmp
+             res = H_bo + two_el_bo 
+             res[:basis_acc.nbf(),:basis_acc.nbf()] += (VxcAA_high - VxcAA_low)
              return res
     
     def __del__(self):

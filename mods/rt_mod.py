@@ -265,8 +265,8 @@ def dipole_selection(dipole,idlist,nocc,occlist,virtlist,odbg=sys.stderr,debug=F
     return res
 ##################################################################
 
-def mo_fock_mid_forwd_eval(D_ti,fock_mid_ti_backwd,i,delta_t,H,I,U,dipole,\
-                               C,C_inv,S,nbf,imp_opts,func_h,func_l,fout,basisset,bsetH,exA=False):
+def mo_fock_mid_forwd_eval(D_ti,fock_mid_ti_backwd,i,delta_t,fock_base,U,dipole,\
+                               C,C_inv,S,imp_opts,func_h,fout,bsetH,exA=False):
 
     t_arg=np.float_(i)*np.float_(delta_t)
     
@@ -281,13 +281,11 @@ def mo_fock_mid_forwd_eval(D_ti,fock_mid_ti_backwd,i,delta_t,H,I,U,dipole,\
     
     k=1
     
-    Eh_i,Exclow_i,ExcAAhigh_i,ExcAAlow_i,fock_mtx = bo_helper.get_BOFockRT(D_ti,H,I,U,func_h,func_l,basisset,bsetH)
+    Eh_i,Exclow_i,ExcAAlow_i,ExcAAhigh_i,fock_mtx = fock_base.get_bblock_Fock(Dmat=D_ti,func_acc=func_h,basis_acc=bsetH,U=U,return_ene=True)
     #DEBUG
     #ExcAAhigh_i=0.0
     #ExcAAlow_i=0.0
     
-    #Eh_i,Exclow_i,fock_mtx=get_Fock(D_ti,H,I,func_l,basisset)
-    #print('fockmtx s out of loop max diff: %.12e\n' % np.max(tfock_mtx-fock_mtx))
     #add -pulse*dipole
     if exA:
        dimA = bsetH.nbf()
@@ -328,7 +326,7 @@ def mo_fock_mid_forwd_eval(D_ti,fock_mid_ti_backwd,i,delta_t,H,I,U,dipole,\
         
         #DEBUG
         #dum1,dum2,fock_mtx=get_Fock(D_ti_dt,H,I,func_l,basisset)
-        dum0,dum1,dum2,dum3,fock_mtx = bo_helper.get_BOFockRT(D_ti_dt,H,I,U,func_h,func_l,basisset,bsetH)
+        dum0,dum1,dum2,dum3,fock_mtx = fock_base.get_bblock_Fock(Dmat=D_ti_dt,func_acc=func_h,basis_acc=bsetH,U=U,return_ene=True)
         #print('fockmtx s in loop max diff: %.12e\n' % np.max(tfock_mtx-fock_mtx))
         #update t_arg+=delta_t
         pulse_dt = func(imp_opts['Fmax'], imp_opts['w'], t_arg+delta_t,\
@@ -367,10 +365,8 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
     ndocc = wfn_bo['ndocc']
     func_h = wfn_bo['func_h']
     func_l = wfn_bo['func_l']
-    jkflag = wfn_bo['jkflag']
+    jkclass = wfn_bo['jkfactory']
     exmodel = wfn_bo['exmodel']
-    scf_type = wfn_bo['scf_type']
-
 
     #a minimalistic RT propagation code
     molist = mo_select.split("&")
@@ -421,20 +417,13 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
 
     #initialize the mints object
     mints = psi4.core.MintsHelper(bset)
+    #intialize fock_factory
+    from Fock_helper import fock_factory
+    Hcore = np.asarray(mints.ao_potential()) + np.asarray(mints.ao_kinetic())
 
-    # Run a quick check to make sure everything will fit into memory
-    I_Size = (numbas**4) * 8.e-9
-    print("\nSize of the ERI tensor will be %4.2f GB." % I_Size)
+    fock_base = fock_factory(jkclass,Hcore,Stilde, \
+                            funcname=func_l,basisobj=bset,exmodel=exmodel)
     
-    # Estimate memory usage
-    memory_footprint = I_Size * 1.5
-    if I_Size > numpy_mem:
-        psi4.core.clean()
-        raise Exception("Estimated memory utilization (%4.2f GB) " +\
-                "exceeds numpy_memory limit of %4.2f GB." % (memory_footprint, numpy_mem))
-    #Get Eri (2-electron repulsion integrals)
-    I = np.array(mints.ao_eri())
-
     #dip_mat is transformed in the BO basis
     dipole=mints.ao_dipole()
     dip_mat=np.matmul(U.T,np.matmul(np.array(dipole[direction]),U))
@@ -576,7 +565,7 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
     start =time.time()
     cstart =time.process_time()
     Eh0,Exclow0,ExcAAhigh0,ExcAAlow0,func_t0,F_t0,fock_mid_init = mo_fock_mid_forwd_eval(Dtilde,Ftilde,\
-                            0,np.float_(dt),Htilde,I,U,dip_mat,C,C_inv,Stilde,numbas,imp_opts,func_h,func_l,fo,bset,bsetH,exA_only)
+                            0,np.float_(dt), fock_base, U, dip_mat, C, C_inv, Stilde, imp_opts,func_h, fo, bsetH, exA_only)
 
     #DEBUG
     #import bo_helper
@@ -664,7 +653,7 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
 
 
         Eh_i,Exclow_i,ExcAAhigh_i,ExcAAlow_i,func_ti,F_ti,fock_mid_tmp = mo_fock_mid_forwd_eval(np.copy(D_ti),fock_mid_backwd,\
-                                                j,np.float_(dt),Htilde,I,U,dip_mat,C,C_inv,Stilde,numbas,imp_opts,func_h,func_l,fo,bset,bsetH,exA_only)
+                                                j,np.float_(dt),fock_base,U,dip_mat,C,C_inv,Stilde,imp_opts,func_h,fo,bsetH,exA_only)
 
         diff_midF=fock_mid_tmp-fock_mid_backwd
 

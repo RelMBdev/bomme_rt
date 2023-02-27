@@ -38,9 +38,13 @@ if __name__ == "__main__":
     parser.add_argument("-f1","--func1", help="Specify the high level theory functional", required=False, 
             type=str, default="blyp")
     parser.add_argument("--scf_type", help="Specify the scf type: direct or df (for now)", required=False, 
-            type=str, default="direct")
+            type=str, default="DIRECT")
     parser.add_argument("-J", "--jkclass", help="Use JK class for J and K matrix computation", required=False,
             default=False, action="store_true")
+    parser.add_argument("--eri", help="Set type of ERI for tensor contraction, nofit|fit (default: None)", required=False,
+            default=None)
+    parser.add_argument("--fitt_HF_exch", help="(If JKClass is employed) fit imaginaty-part HF exchange if the density is complex (for HYBRIDs)",
+                       required=False,default=False, action="store_true")
     parser.add_argument("-m", "--numpy_mem", help="Set the memeory for the PSI4 driver (default 2 Gib)", required=False,
             default=2, type = int)
 
@@ -54,10 +58,6 @@ if __name__ == "__main__":
     # options for RT 
     parser.add_argument("--real_time", help="Real time propagation on", required=False,
             default=False, action="store_true")
-    parser.add_argument("--fitted_rt", help="Real time propagation using fitted J matrix", required=False,
-            default=False, action="store_true")
-    parser.add_argument("--fitt_HF_exch", help="If Fitted_RT = True (and JKClass is employed) use fitted HF exchange (for HYBRIDs)",
-                       required=False,default=False, action="store_true")
     parser.add_argument("--exciteA_only", help="Only the A subsystem is excited", 
                        required=False,default=False, action="store_true")
     parser.add_argument("--local_basis", help="Use local basis ", required=False,
@@ -77,10 +77,10 @@ if __name__ == "__main__":
 
     # call functions here    
     bset,bsetH, molelecule_str, psi4mol, wfn, jkbase = initialize(args.jkclass,args.scf_type,args.obs1,args.obs2,args.geomA,\
-                   args.func1,args.func2,args.charge)
+                   args.func1,args.func2,args.charge,args.numpy_mem,args.eri,args.fitt_HF_exch)
 
 
-    res, wfnBO = run(args.jkclass,args.scf_type,psi4mol,bset,bsetH,args.guess,args.func1,args.func2,args.exmodel,wfn,args.numpy_mem)
+    res, wfnBO = run(jkbase,psi4mol,bset,bsetH,args.guess,args.func1,args.func2,args.exmodel,wfn)
     import rt_mod
 
 
@@ -93,12 +93,7 @@ if __name__ == "__main__":
            exit(1)
 
        print("Startig real-time tddft computation")
-       #check options consistency
-       if args.fitted_rt and (not args.fitt_HF_exch):
-          raise "Check RT and HF exchange fitting flag\n"
-       
-       if (not args.fitted_rt) and (not args.fitt_HF_exch):
-          print()
-          # call rt using the four indices I tensor (for small systems due to memory requirements)
-          rt_mod.run_rt_iterations(fnameinput, bset, bsetH, wfnBO, psi4mol, args.axis, args.select, args.selective_pert, args.local_basis, args.exciteA_only, args.numpy_mem, args.debug)
+       print()
+       # call rt using the four indices I tensor (for small systems due to memory requirements)
+       rt_mod.run_rt_iterations(fnameinput, bset, bsetH, wfnBO, psi4mol, args.axis, args.select, args.selective_pert, args.local_basis, args.exciteA_only, args.numpy_mem, args.debug)
          

@@ -12,9 +12,9 @@ if modpaths is not None :
     for path in modpaths.split(";"):
         sys.path.append(path)
 
-import bo_helper
+#import bo_helper
 import helper_HF
-from molecule import Molecule
+#from molecule import Molecule
 
 # Diagonalize routine
 def build_orbitals(diag,O,nbasis,ndocc):
@@ -32,9 +32,8 @@ def build_orbitals(diag,O,nbasis,ndocc):
     D = psi4.core.doublet(Cocc, Cocc, False, True)
     return C, Cocc, D
 
-def run(jkflag,scf_type,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,numpy_mem):
+def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn):
     
-    numpy_memory=numpy_mem
     numbas = bset.nbf()
     nbfA = bsetH.nbf()
     
@@ -59,48 +58,9 @@ def run(jkflag,scf_type,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,numpy_
     #check the off diag block of Stilde
     mtest=np.zeros((nbfA,(numbas-nbfA)))
     print("Overlap_AB in BO is zero: %s" %(np.allclose(Stilde[:nbfA,nbfA:],mtest)))
-    #get the 2eri tensor 
-    # Run a quick check to make sure everything will fit into memory
-    I_Size = (numbas**4) * 8.e-9
-    print("\nSize of the ERI tensor would be %4.2f GB." % I_Size)
 
-    # Estimate memory usage
-    memory_footprint = I_Size * 1.5
-    scf_type = psi4.core.get_global_option("scf_type")
     #CHECK
     print("using EX model: ......... %i\n" % exmodel)
-
-    print("JK Class: %s" % jkflag)
-    if jkflag:
-
-      # Initialize the JK object
-      if (scf_type=='DIRECT' or scf_type=='PK'): 
-         print("using %s scf and JK class\n" % scf_type)
-         jk = psi4.core.JK.build(bset)
-      elif scf_type == 'MEM_DF':
-         print("using %s\n" % scf_type)
-         auxb = psi4.core.BasisSet.build(embmol,"DF_BASIS_SCF", "", fitrole="JKFIT",other=psi4.core.get_global_option("BASIS"))
-         jk = psi4.core.JK.build_JK(bset,auxb)
-      else:
-           print(scf_type)
-           raise Exception("Invalid scf_type.\n")
-      jk.set_memory(int(4.0e9))  # 1GB
-      jk.set_do_wK(False)
-      jk.initialize()
-      jk.print_header()
-      
-    else:
-      if I_Size > numpy_memory:
-          psi4.core.clean()
-          raise Exception("Estimated memory utilization (%4.2f GB) " +\
-                  "exceeds numpy_memory limit of %4.2f GB." % (memory_footprint, numpy_memory))
-      #Get Eri (2-electron repulsion integrals)
-      I = np.array(mints.ao_eri())
-    # test: check the 2eri tensor for the high level part
-    #Get Eri (2-electron repulsion integrals)
-    #I = np.array(mints.ao_eri())
-    #I11=I[:nbfA,:nbfA,:nbfA,:nbfA]
-    #I22=I[nbfA:,nbfA:,nbfA:,nbfA:]
 
 
     ndocc=wfn.nalpha()
@@ -136,14 +96,11 @@ def run(jkflag,scf_type,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,numpy_
     A.power(-0.5, 1.e-16)
     A = np.asarray(A)
 
-    # Calculate initial core guess on the original AB basis
-    Hp = A.dot(Hcore).dot(A)           
-    e, C2 = np.linalg.eigh(Hp)     
-    C = A.dot(C2)                  
-    Cocc = C[:, :ndocc]
-    D=np.matmul(Cocc,Cocc.T)
-    # Calculate initial core guess on the BO basis
-    # Orthogonalizer B = Sbo^(-1/2) using Psi4's matrix power.
+    #initialise fock_factory
+    from Fock_helper import fock_factory
+    # for now exmodel=0 is assumed
+    fock_help = fock_factory(jkclass,Hcore,S,funcname=func_l,basisobj=bset,exmodel=exmodel)
+
     B = psi4.core.Matrix.from_array(Stilde)
     B.power(-0.5, 1.e-16)
 
@@ -173,15 +130,18 @@ def run(jkflag,scf_type,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,numpy_
 
     #Htilde is expressed in BO basis
     Htilde=np.matmul(U.T,np.matmul(Hcore,U))
+    
+    try:
+       u=np.linalg.inv(U)
+    except np.linalg.LinAlgError:
+       print("Error in linalg.inv")
+    
     if guess == 'SAD': 
        #in AO basis
        Da=SAD.Da()
        Cocc = psi4.core.Matrix(numbas, ndocc)
        Cocc.np[:] = (SAD.Ca()).np[:,:ndocc]
-       try:
-          u=np.linalg.inv(U)
-       except np.linalg.LinAlgError:
-          print("Error in linalg.inv")
+       
        Dtilde=np.matmul(u,np.matmul(Da,u.T))
        Dtilde=psi4.core.Matrix.from_array(Dtilde)
        Cocc=np.matmul(u,Cocc)
@@ -190,10 +150,7 @@ def run(jkflag,scf_type,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,numpy_
        #C, Cocc, Dtilde = build_orbitals(psi4.core.Matrix.from_array(Htilde))
     elif guess == 'GS':
        print("using as guess the density from the low level theory hamiltonian")
-       try:
-          u=np.linalg.inv(U)
-       except np.linalg.LinAlgError:
-          print("Error in linalg.inv")
+       
        Dtilde=np.matmul(u,np.matmul(np.asarray(wfn.Da()),u.T))
        Dtilde=psi4.core.Matrix.from_array(Dtilde)
        Cocc=np.matmul(u,np.asarray(wfn.Ca_subset('AO','OCC')))
@@ -210,39 +167,34 @@ def run(jkflag,scf_type,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,numpy_
     E = 0.0
     Enuc = embmol.nuclear_repulsion_energy()
     Eold = 0.0
-    Dold = np.zeros_like(D)
+    Dold = np.zeros_like(Dtilde)
 
     #E_1el = np.einsum('pq,pq->', H + H, D) + Enuc
     #Ebo_1el = np.einsum('pq,pq->', Htilde + Htilde, Dtilde) + Enuc
     #print('One-electron energy calculated in AO and BO : %4.16f, %4.16f' % (E_1el,Ebo_1el))
     #print(np.allclose(E_1el,Ebo_1el))
 
-
+    # Cocc is in BO basis
     print('\nStart SCF iterations:\n\n')
     t = time.time()
 
     for SCF_ITER in range(1, maxiter + 1):
 
-        #Eh,Exc,Ftilde=bo_helper.test_Fock(Dtilde, Htilde, I,U,'blyp', bset)
-        if jkflag:
-            Eh,Exclow,ExcAAhigh,ExcAAlow,Ftilde=bo_helper.get_BOFock_JK(Dtilde,Cocc,Htilde,jk,U,func_h,func_l,bset,bsetH,nbfA,exmodel)
-        else:
-            Eh,Exclow,ExcAAhigh,ExcAAlow,Ftilde=bo_helper.get_BOFock(Dtilde,Htilde,I,U,func_h,func_l,bset,bsetH,exmodel)
-        #print(np.allclose(Ftilde,dFtilde))
+        Eh, Exclow, ExcAAlow, ExcAAhigh, Ftilde=fock_help.get_bblock_Fock(Cocc=Cocc,func_acc=func_h,basis_acc=bsetH,U=U,return_ene=True)
         
         # DIIS error build and update
-        diis_e = psi4.core.triplet(Ftilde, Dtilde, Stilde, False, False, False)
-        diis_e.subtract(psi4.core.triplet(Stilde, Dtilde, Ftilde, False, False, False))
-        diis_e = psi4.core.triplet(B, diis_e, B, False, False, False)
+        diis_e = np.matmul(Ftilde, np.matmul(Dtilde, Stilde))
+        diis_e -=np.matmul(Stilde, np.matmul(Dtilde, Ftilde))
+        diis_e = np.matmul(B, np.matmul(diis_e, B))
 
-        diis.add(Ftilde, diis_e)
+        diis.add(psi4.core.Matrix.from_array(Ftilde), psi4.core.Matrix.from_array(diis_e) )
 
         # SCF energy and update
         
         #SCF_E = Eh + Exc + Enuc + 2.0*np.trace(np.matmul(Dtilde,Htilde))
         SCF_E = Eh + Exclow + ExcAAhigh -ExcAAlow + Enuc + 2.0*np.trace(np.matmul(Dtilde,Htilde))
         
-        dRMS = diis_e.rms()
+        dRMS = np.sqrt(np.mean(diis_e**2))
 
         print('SCF Iteration %3d: Energy = %4.16f   dE = % 1.5E   dRMS = %1.5E'
               % (SCF_ITER, SCF_E, (SCF_E - Eold), dRMS))
@@ -292,10 +244,8 @@ def run(jkflag,scf_type,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,numpy_
     Fscf=np.matmul(U.T,np.matmul(Ftilde,U))
     Cocc_scf=np.matmul(U,Cocc)
 
-    if jkflag:
-        Eh,Exclow,ExcAAhigh,ExcAAlow,dummyF=bo_helper.get_BOFock_JK(psi4.core.Matrix.from_array(Dscf),Cocc_scf,Hcore,jk,dummy_U,func_h,func_l,bset,bsetH,nbfA,exmodel)
-    else:
-        Eh,Exclow,ExcAAhigh,ExcAAlow,dummyF=bo_helper.get_BOFock(psi4.core.Matrix.from_array(Dscf),Hcore,I,dummy_U,func_h,func_l,bset,bsetH,exmodel)
+    Eh, Exclow, ExcAAlow, ExcAAhigh, dummy=fock_help.get_bblock_Fock(Cocc=Cocc_scf,func_acc=func_h,basis_acc=bsetH,U=dummy_U,return_ene=True)
+    
     SCF_E = Eh + Exclow + ExcAAhigh -ExcAAlow + Enuc + 2.0*np.trace(np.matmul(Dscf,Hcore))
     print('Final SCF (Density Corrected) energy: %.8f hartree\n' % SCF_E)
 
@@ -327,7 +277,7 @@ def run(jkflag,scf_type,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,numpy_
     wfn.Fb().copy( psi4.core.Matrix.from_array(Fscf) )
     
     wfn_BObasis = {'Fock' : Ftilde, 'Hcore': Htilde, 'Dmtx' : Dtilde, 'Ccoeff' : C, 'Ovap' : Stilde, 'Umat' : U,\
-                    'nbf_A': nbfA, 'nbf_tot' : numbas, 'ndocc' : ndocc,'jkflag' : jkflag, 'scf_type' : scf_type,\
+                    'nbf_A': nbfA, 'nbf_tot' : numbas, 'ndocc' : ndocc,'jkfactory' : jkclass,\
                     'func_h': func_h, 'func_l' : func_l, 'exmodel':exmodel }
     
     return wfn, wfn_BObasis
