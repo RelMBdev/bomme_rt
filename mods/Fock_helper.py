@@ -295,7 +295,7 @@ class fock_factory():
           if isinstance(U,np.ndarray):
              res = np.matmul(U.T,np.matmul(res,U))
           return res
-    def get_xcpot(self,func,bset,Dmat=None,Cocc=None,exmodel=0,return_ene=False):
+    def get_xcpot(self,func,bset,Dmat=None,Cocc=None,exmodel=0,return_ene=False,U=None):
           # exmodel = 0 and basis=basis_total make the Vxc coincide with the standard supermolecular Vxc matrix
           # basis denote the basis in which the final Fock mtx 
           # will be expressed (total basis or fragment basis)
@@ -318,7 +318,7 @@ class fock_factory():
              
              
         
-             K = self.__jkfact.K(Cocc_A,Dmat,out=[[0,nbf],[0,nbf]])    #assuming Exc0 model?
+             K = self.__jkfact.K(Cocc_A,Dmat,sum_idx=[[0,nbf],[0,nbf]],out_idx=[[0,nbf],[0,nbf]])    #assuming Exc0 model?
              #Exc_ex0 =  -np.trace(np.matmul(Dbo.np[:na,:na],K))
              #print("ExceAAhigh EX0 mod: %.10e\n" % Exc_ex0)
              #exchange model 1
@@ -328,12 +328,14 @@ class fock_factory():
                  if nbf >= nlim:
                      raise Exception("Check dimension of sub sys basis set\n")
                  Cocc_B=np.zeros_like(Cocc)
+                 CoccAO = np.matmul(U,Cocc)
+                 DmatAO = np.matmul(U.T,np.matmul(Dmat,U))
                  Cocc_B[nbf:nlim,:]=np.asarray(CoccAO)[nbf:nlim,:] #see J. Chem. Theory Comput. 2017, 13, 1605-1615
                  
                  #DEBUG
                  #check=np.matmul(Cocc_B,Cocc_B.T)
                  #print("Dbo[na:,na:] & Dbo[Cocc[na:,:]] : %s\n" % np.allclose(Dbo.np[na:,na:],check[na:,na:]))
-                 K1 = self.__jkfact.K(Cocc_B,Dmat,sum_idx=[[nbf,nlim],[nbf,nlim]],out=[[0,nbf],[0,nbf]])
+                 K1 = self.__jkfact.K(Cocc_B,DmatAO,sum_idx=[[nbf,nlim],[nbf,nlim]],out_idx=[[0,nbf],[0,nbf]])
                 
              
                  #Exc_ex1 =  -np.trace(np.matmul(Dbo.np[:na,:na],K1))
@@ -356,16 +358,18 @@ class fock_factory():
                       Cocc_A = None
                
                
-                  K = self.__jkfact.K(Cocc_A,Dmat,out=[[0,nbf],[0,nbf]])    
+                  K = self.__jkfact.K(Cocc_A,Dmat,sum_idx=[[0,nbf],[0,nbf]],out_idx=[[0,nbf],[0,nbf]])    
                   if exmodel==1:
                       nlim = Dmat.shape[0]
                       if nbf >= nlim:
                           raise Exception("Check dimension of sub sys basis set\n")
                       Cocc_B=np.zeros_like(Cocc)
+                      CoccAO = np.matmul(U,Cocc)
+                      DmatAO = np.matmul(U.T,np.matmul(Dmat,U))
                       Cocc_B[nbf:,:]=np.asarray(CoccAO)[nbf:,:] #see J. Chem. Theory Comput. 2017, 13, 1605-1615
                       
                   
-                      K1 = self.__jkfact.K(Cocc_B,sum_idx=[[nbf,nlim],[nbf,nlim]],out=[[0,nbf],[0,nbf]])
+                      K1 = self.__jkfact.K(Cocc_B,DmatAO,sum_idx=[[nbf,nlim],[nbf,nlim]],out_idx=[[0,nbf],[0,nbf]])
                   
                       K += K1
                   if np.iscomplexobj(K):
