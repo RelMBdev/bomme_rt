@@ -68,49 +68,57 @@ class jkfactory():
     def is_native(self):
         return self.__jkflag
 
-    def J(self,Cocc,Dmat=None,sum_idx=None,out=None):#Dmat and Cocc are expressed on the Ao basis
+    def J(self,Cocc,Dmat=None,sum_idx=None,out_idx=None):#Dmat and Cocc are expressed on the Ao basis
            nbf = self.__basisobj.nbf()  # C/Den matrix passed in full dimension, slicing 
                                         # if needed is carried out afterwards
            if not isinstance(Dmat,np.ndarray):
                Dmat = np.matmul(Cocc,np.conjugate(Cocc.T))
+           if Dmat.shape[0] != Dmat.shape[1]:
+               raise Exception("wrong Dmat shape")
            # prepare standard index list
-           if (sum_idx is  None) and (out is None):
-             Idx= [0,nbf,0,nbf]  # define the subblock nrow,ncol for contraction
-             idx = [0,nbf,0,nbf] #slicing the result
-           elif (sum_idx is not None):
-             Idx = []
-             idx = [0,nbf,0,nbf]
-             
-             for el in sum_idx:
-                 
-                 for subel in el:
-                    Idx.append(subel)
-             
-           elif (out is not None):
-             idx = []  
-             Idx = [0,nbf,0,nbf]
-             for elm in out:
-                 
-                 for subel in elm:
-                    idx.append(subel)                    
-           else:
-             Idx = []
-             idx = []
+           if (sum_idx is  None) and (out_idx is None):
+             i_id= [0,nbf,0,nbf]  # define the subblock nrow,ncol for contraction
+             o_id = [0,nbf,0,nbf] #slicing the result
+           elif (sum_idx is not  None) and (out_idx is not None):
+             i_id = []
+             o_id = []
              for elm in sum_idx:
                  
                  for subel in elm:
-                    Idx.append(subel)
-             for elm in out:
+                    i_id.append(subel)
+             for elm in out_idx:
                  
                  for subel in elm:
-                    idx.append(subel)
+                    o_id.append(subel)
+           elif (sum_idx is not None):
+             o_id = [0,nbf,0,nbf]
+             
+             i_id = []
+             for el in sum_idx:
+                 
+                 for subel in el:
+                    i_id.append(subel)
+             
+           elif (out_idx is not None):
+             i_id= [0,nbf,0,nbf]
+             o_id = []  
+             for elm in out_idx:
+                 
+                 for subel in elm:
+                    o_id.append(subel)                    
+           else:
+             print("check contraction indices")  
+           #print("sum indices for J")         
+           #print(i_id)
+           #print("output indices for J")
+           #print(o_id)
            if self.__jkflag :
               if not isinstance(Cocc,np.ndarray):
                  raise Exception("Cocc is not np.ndarray")
               self.__jk.C_left_add(psi4.core.Matrix.from_array(Cocc))
               self.__jk.compute()
               self.__jk.C_clear()
-              Jmat=np.array(self.__jk.J()[0]) #copy into J
+              Jmat=np.array(self.__jk.J()[0])[o_id[0]:o_id[1],o_id[2]:o_id[3]]#copy into J
 
            elif (self.__eri is not None):
                #print("nbf: %i\n" % nbf)
@@ -118,66 +126,71 @@ class jkfactory():
                #print("idx and Idx")
                #print(idx,Idx)
                if not (self.__eri_axis < 4):
-                  eri = self.__eri[idx[0]:idx[1],idx[2]:idx[3],Idx[0]:Idx[1],Idx[2]:Idx[3]]
-                  Jmat=np.einsum('pqrs,rs->pq', eri, Dmat[Idx[0]:Idx[1],Idx[2]:Idx[3]])
+                  eri = self.__eri[o_id[0]:o_id[1],o_id[2]:o_id[3],i_id[0]:i_id[1],i_id[2]:i_id[3]]
+                  Jmat=np.einsum('pqrs,rs->pq', eri, Dmat[i_id[0]:i_id[1],i_id[2]:i_id[3]])
                else:  
-                  X_Q = np.einsum('Qpq,pq->Q', self.__eri[:,Idx[0]:Idx[1],Idx[2]:Idx[3]], Dmat[Idx[0]:Idx[1],Idx[2]:Idx[3]])
-                  Jmat = np.einsum('Qpq,Q->pq', self.__eri, X_Q)[idx[0]:idx[1],idx[2]:idx[3]]
+                  X_Q = np.einsum('Qpq,pq->Q', self.__eri[:,i_id[0]:i_id[1],i_id[2]:i_id[3]], Dmat[i_id[0]:i_id[1],i_id[2]:i_id[3]])
+                  Jmat = np.einsum('Qpq,Q->pq', self.__eri, X_Q)[o_id[0]:o_id[1],o_id[2]:o_id[3]]
 
            return Jmat      
 
 
-    def K(self,Cocc,Dmat=None,sum_idx=None,out=None):
+    def K(self,Cocc,Dmat=None,sum_idx=None,out_idx=None):
             nbf = self.__basisobj.nbf()
             if not isinstance(Dmat,np.ndarray):
                 Dmat = np.matmul(Cocc,np.conjugate(Cocc.T))
             # prepare standard index list
-            if (sum_idx is  None) and (out is None):
-              Idx= [0,nbf,0,nbf]  # define the subblock nrow,ncol for contraction
-              idx = [0,nbf,0,nbf] #slicing the result
+            if (sum_idx is  None) and (out_idx is None):
+              i_id= [0,nbf,0,nbf]  # define the subblock nrow,ncol for contraction
+              o_id = [0,nbf,0,nbf] #slicing the result
+            elif (sum_idx is not  None) and (out_idx is not None):
+              i_id = []
+              o_id = []
+              for elm in sum_idx:
+                  
+                  for subel in elm:
+                     i_id.append(subel)
+              for elm in out_idx:
+                  
+                  for subel in elm:
+                     o_id.append(subel)
             elif (sum_idx is not None):
-              Idx = []
-              idx = [0,nbf,0,nbf]
+              o_id = [0,nbf,0,nbf]
               
-              for elm in sum_idx:
+              i_id = []
+              for el in sum_idx:
+                  
+                  for subel in el:
+                     i_id.append(subel)
+              
+            elif (out_idx is not None):
+              i_id= [0,nbf,0,nbf]
+              o_id = []  
+              for elm in out_idx:
                   
                   for subel in elm:
-                     Idx.append(subel)
-            elif (out is not None):
-              idx = []  
-              Idx = [0,nbf,0,nbf]
-              for elm in out:
-                  
-                  for subel in elm:
-                     idx.append(subel)
-            else: # for general case, rarely needed
-              Idx = []
-              idx = []
-              for elm in sum_idx:
-                  
-                  for subel in elm:
-                     Idx.append(subel)
-              for elm in out:
-                  
-                  for subel in elm:
-                     idx.append(subel)
-            #print(Idx)
-            #print(idx)
+                     o_id.append(subel)                    
+            else:
+              print("check contraction indices")  
+            #print("sum indices for K")         
+            #print(i_id)
+            #print("output indices for K")
+            #print(o_id)
             if self.__jkflag :
                if not isinstance(Cocc,np.ndarray):
                   raise Exception("Cocc is not np.ndarray")
                self.__jk.C_left_add(psi4.core.Matrix.from_array(Cocc))
                self.__jk.compute()
                self.__jk.C_clear()
-               Kmat=np.array(self.__jk.K()[0])[idx[0]:idx[1],idx[2]:idx[3]] #
+               Kmat=np.array(self.__jk.K()[0])[o_id[0]:o_id[1],o_id[2]:o_id[3]] #
                # the native jkclass will use real mol. orbital (nat orbitals of D.real) to compute K, neglecting
                # the imaginary part of D (D.imag)
                if self.__rtfit and np.iscomplexobj(Dmat) :
                   # print("debug: fitting the residual K.imag")
                   if not (self.__eri_axis < 4):
                      raise Exception("need fitted 3-index tensor here") 
-                  Z_Qqr = np.einsum('Qrs,sq->Qrq', self.__eri[:,idx[2]:idx[3],Idx[2]:Idx[3]], (Dmat.imag)[Idx[0]:Idx[1],Idx[2]:Idx[3]])
-                  tmp = np.einsum('Qpq,Qrq->pr', self.__eri[:,idx[0]:idx[1],Idx[0]:Idx[1]], Z_Qqr)
+                  Z_Qqr = np.einsum('Qrs,sq->Qrq', self.__eri[:,o_id[2]:o_id[3],i_id[0]:i_id[1]], (Dmat.imag)[i_id[0]:i_id[1],i_id[2]:i_id[3]])
+                  tmp = np.einsum('Qpq,Qrq->pr', self.__eri[:,o_id[0]:o_id[1],i_id[2]:i_id[3]], Z_Qqr)
                   Ktmp = np.zeros((nbf,nbf),dtype=np.complex128)
                   Ktmp.real = Kmat
                   Ktmp.imag = tmp
@@ -185,12 +198,13 @@ class jkfactory():
             elif (self.__eri is not None):
                if not self.__eri_axis < 4:
                   #'prqs,rs->pq'
-                  eri = self.__eri[idx[0]:idx[1],Idx[0]:Idx[1],idx[2]:idx[3],Idx[2]:Idx[3]] 
-                  Kmat=np.einsum('prqs,rs->pq', eri, Dmat[Idx[0]:Idx[1],Idx[2]:Idx[3]])
+                  eri = self.__eri[o_id[0]:o_id[1],i_id[0]:i_id[1],o_id[2]:o_id[3],i_id[2]:i_id[3]]
+                  #print("%i:%i , %i:%i, %i:%i, %i:%i" % (o_id[0],o_id[1],i_id[0],i_id[1],o_id[2],o_id[3],i_id[2],i_id[3]))
+                  Kmat=np.einsum('prqs,rs->pq', eri, Dmat[i_id[0]:i_id[1],i_id[2]:i_id[3]])
                else:
                   #print("debug fitted_eri Kmat")
-                  Z_Qqr = np.einsum('Qrs,sq->Qrq', self.__eri[:,idx[2]:idx[3],Idx[2]:Idx[3]], Dmat[Idx[0]:Idx[1],Idx[2]:Idx[3]])
-                  Kmat = np.einsum('Qpq,Qrq->pr', self.__eri[:,idx[0]:idx[1],Idx[0]:Idx[1]], Z_Qqr)
+                  Z_Qqr = np.einsum('Qrs,sq->Qrq', self.__eri[:,o_id[2]:o_id[3],i_id[0]:i_id[1]], Dmat[i_id[0]:i_id[1],i_id[2]:i_id[3]])
+                  Kmat = np.einsum('Qpq,Qrq->pr', self.__eri[:,o_id[0]:o_id[1],i_id[2]:i_id[3]], Z_Qqr)
             return Kmat
        
 class dft_xc():
