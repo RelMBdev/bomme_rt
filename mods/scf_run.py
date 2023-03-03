@@ -99,7 +99,7 @@ def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn):
     #initialise fock_factory
     from Fock_helper import fock_factory
     # for now exmodel=0 is assumed
-    fock_help = fock_factory(jkclass,Hcore,S,funcname=func_l,basisobj=bset,exmodel=exmodel)
+    fock_help = fock_factory(jkclass,Hcore,Stilde,funcname=func_l,basisobj=bset,exmodel=exmodel)
 
     B = psi4.core.Matrix.from_array(Stilde)
     B.power(-0.5, 1.e-16)
@@ -158,7 +158,6 @@ def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn):
        raise Exception("Invalid guess type.\n")
 
 
-    Stilde=psi4.core.Matrix.from_array(Stilde)
     # Set defaults
     maxiter = 80
     E_conv = 1.0E-8
@@ -268,15 +267,8 @@ def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn):
     print('Max of the abs density difference : %.12e\n' % np.max(np.abs(diff)))
     #np.savetxt("dmat_BO.txt",Dtilde) #the density matrix in BO basis
     ###
-    #update the wfn object
-    wfn.Da().copy( psi4.core.Matrix.from_array(Dscf) )
-    wfn.Db().copy( psi4.core.Matrix.from_array(Dscf) )
-    wfn.Ca().copy( psi4.core.Matrix.from_array(C_AO) )
-    wfn.Cb().copy( psi4.core.Matrix.from_array(C_AO) )
-    wfn.Fa().copy( psi4.core.Matrix.from_array(Fscf) )
-    wfn.Fb().copy( psi4.core.Matrix.from_array(Fscf) )
     
-    wfn_BObasis = {'Fock' : Ftilde, 'Hcore': Htilde, 'Dmtx' : Dtilde, 'Ccoeff' : C, 'Ovap' : Stilde, 'Umat' : U,\
+    wfn_BObasis = {'Fock' : Ftilde, 'Hcore': Htilde, 'epsilon_a' : eigvals, 'energy': SCF_E, 'Dmtx' : Dtilde, 'Ccoeff' : C, 'Ovap' : Stilde, 'Umat' : U,\
                     'nbf_A': nbfA, 'nbf_tot' : numbas, 'ndocc' : ndocc,'jkfactory' : jkclass,\
                     'func_h': func_h, 'func_l' : func_l, 'exmodel':exmodel }
     

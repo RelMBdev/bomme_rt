@@ -491,6 +491,28 @@ class fock_factory():
              res = H_bo + two_el_bo 
              res[:basis_acc.nbf(),:basis_acc.nbf()] += (VxcAA_high - VxcAA_low)
              return res
-    
+   
+    # define a general function to simulate function overloading
+    def get_fock(self,Cocc=None,Dmat=None,func_acc=None,basis_acc=None,U=None,return_ene=False):
+
+         ExcAAlow  = None
+         ExcAAhigh = None
+
+         if (func_acc is not None) and (basis_acc is not None):
+              results = self.get_bblock_Fock(Cocc,Dmat,func_acc,basis_acc,U,return_ene)
+         else:
+              results = get_Fock(Cocc,Dmat,return_ene)
+         if return_ene:
+              Eh = results[0]
+              Exclow = results[1]
+              if len(results) > 3:
+                ExcAAlow = results[2]
+                ExcAAhigh = results[3]
+                fock_mtx  = results[4]
+              else:  
+                fock_mtx = results[3]  
+              return Eh, Exclow, ExcAAlow, ExcAAhigh,fock_mtx  
+         else:  
+              return results
     def __del__(self):
          return None
