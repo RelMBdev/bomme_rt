@@ -211,7 +211,7 @@ def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn):
         ####################################################################################################################
         # solve the generalized eigenvalue in the block-orthogonalized basis (Stilde)
         try: 
-                eigvals,C=scipy.linalg.eigh(Ftilde.np,Stilde.np,eigvals_only=False)
+                eigvals,C=scipy.linalg.eigh(Ftilde.np,Stilde,eigvals_only=False)
         except scipy.linalg.LinAlgError:
                 print("Error in scipy.linalg.eigh")
         Cocc=C[:,:ndocc]        

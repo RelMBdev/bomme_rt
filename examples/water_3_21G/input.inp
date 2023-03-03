@@ -1,4 +1,4 @@
-time_int: 300
+time_int: 1.0
 delta_t : 0.1
 calc_flag :1
 i_rest : 0
