@@ -81,7 +81,7 @@ if __name__ == "__main__":
 
 
     res, wfnBO = run(jkbase,psi4mol,bset,bsetH,args.guess,args.func1,args.func2,args.exmodel,wfn)
-    import rt_mod
+    import rt_mod_new
 
 
 
@@ -95,5 +95,5 @@ if __name__ == "__main__":
        print("Startig real-time tddft computation")
        print()
        # call rt using the four indices I tensor (for small systems due to memory requirements)
-       rt_mod.run_rt_iterations(fnameinput, bset, bsetH, wfnBO, psi4mol, args.axis, args.select, args.selective_pert, args.local_basis, args.exciteA_only, args.numpy_mem, args.debug)
+       rt_mod_new.run_rt_iterations(fnameinput, bset, bsetH, wfnBO, psi4mol, args.axis, args.select, args.selective_pert, args.local_basis, args.exciteA_only, args.numpy_mem, args.debug)
          

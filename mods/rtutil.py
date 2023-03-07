@@ -57,7 +57,28 @@ def set_input(fgeom):
   f.close()
   return geomobj, mol,numat,species
 ##################################################################
+def set_params(fname):
+    my_dict = {}
+    with open(fname) as fileobj:
+      for line in fileobj:
+        key, value = line.split(":")
+        my_dict[key.strip()] = value.strip()
+    fileobj.close()
+    imp_params = {}
+    imp_params['Fmax'] = float(my_dict['F_max'])
+    imp_params['w'] = float(my_dict['freq_carrier'])
+    imp_params['s'] = float(my_dict['sigma'])
+    imp_params['t0'] = float(my_dict['t0']) 
+    imp_params['imp_type'] = my_dict['imp_type']
+    
+    calc_params ={}    
+    calc_params['time_int']=float(my_dict['time_int'])
+    calc_params['delta_t']=float(my_dict['delta_t'])
+    #calc_params['func_type'] =my_dict['func_type'] 
+    #calc_params['method']=my_dict['method_type']
+    return imp_params,calc_params
 
+##################################################################
 def kick (Fmax, w, t, t0=0.0, s=0.0):
 
     w = 0.0

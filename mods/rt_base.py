@@ -33,7 +33,8 @@ class real_time():
       self.__Fock_mid = Fock_init
       self.__ovapm    = Smat # it can represent either overlap of AO basis functions or BO b. funcs
       self.__Cmat  = Cmat    # Cmat contains MO coefficients (either AO or BO)
-      self.__dipmat = dipmat
+      self.__dipmat = None
+      self.__perpdip = []
       self.__Umat     = U
       self.__D = Dinit
       self.__outfile = out_file
@@ -41,6 +42,17 @@ class real_time():
       self.__vemb = None
       self.__ene_list = []
       self.__dip_list = []
+      self.__dperp0_list = [] # the expectation values  of perpendicular components (wrt the boost) of dipole
+      self.__dperp1_list = []
+      self.__field_t = []
+
+      if isinstance(dipmat,list):
+          self.__dipmat = dipmat.pop(0)
+          for mtx in dipmat:
+               self.__perpdip.append(mtx)
+      else:
+          self.__dipmat= dipmat
+        
       if U is not None:
           if not isinstance(U, np.ndarray):
               raise TypeError(" U must be nd.ndarray")
@@ -80,7 +92,10 @@ class real_time():
         Dp_0=np.zeros((self.__numbasis,self.__numbasis))
         for num in range(int(ndocc)):
             Dp_0[num,num]=1.0
-      self.__Dp = Dp_0     
+      self.__Dp = Dp_0
+
+    def dipmat(self):
+        return self.__dipmat
 
     def init_boost(self,selective_pert=False,debug=False):
        dip_mat  = self.__dipmat
@@ -158,7 +173,7 @@ class real_time():
 
         Eh,Exclow,ExcAAhigh,ExcAAlow,func_t,F_ti,fock_mid, Dp_ti_dt = rtutil.mo_fock_mid_forwd_eval(self.__Dp,self.__Fock_mid,\
                             i_step,np.float_(dt), fock_base, dip_mat, C, ovapm, pulse_opts, U, func_h, bsetH, exA_only,fout=fo,debug=False, Vemb=self.__vemb)
-        
+        self.__field_t = func_t
         # expressed in AO basis
         Hcore = fock_base.H()
         if U is not None:
@@ -170,6 +185,11 @@ class real_time():
         self.__ene_list.append(ene)
         
         dipole_avg = np.trace(np.matmul(dip_mat,self.__D))
+
+        if len(self.__perpdip) > 0:
+           self.__dperp0_list.append(np.trace(np.matmul(self.__D,self.__perpdip[0])))
+           self.__dperp1_list.append(np.trace(np.matmul(self.__D,self.__perpdip[1])))
+
 
         self.__dip_list.append(dipole_avg)
 
@@ -189,8 +209,20 @@ class real_time():
         else:
             res = None
         return res
+
+    def get_midpoint_mtx(self):
+        return self.__Fock_mid
+
     def iter_num(self):
         return self.__step_count
+
+    def get_dipole(self):
+        return self.__dip_list, self.__dperp0_list, self.__dperp1_list
+    def get_energy(self):
+        return self.__ene_list
+
+    def get_extfield(self):
+        return self.__field_t
 
     def __del__(self):  # ? destructor
       return None
