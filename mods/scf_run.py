@@ -270,6 +270,6 @@ def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn):
     
     wfn_BObasis = {'Fock' : Ftilde, 'Hcore': Htilde, 'epsilon_a' : eigvals, 'energy': SCF_E, 'Dmtx' : Dtilde, 'Ccoeff' : C, 'Ovap' : Stilde, 'Umat' : U,\
                     'nbf_A': nbfA, 'nbf_tot' : numbas, 'ndocc' : ndocc,'jkfactory' : jkclass,\
-                    'func_h': func_h, 'func_l' : func_l, 'exmodel':exmodel }
+                    'func_h': func_h, 'func_l' : func_l, 'exmodel':exmodel, 'molecule' : embmol }
     
     return wfn, wfn_BObasis

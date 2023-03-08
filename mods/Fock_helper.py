@@ -37,6 +37,7 @@ class jkfactory():
         self.__eri = eri
         self.__eri_axis = None
         self.__jk = None
+        self.__bset = bset
         self.__rtfit = real_time # use density fitting the get the correction to the real-time K matrix when jkclass is on
         if jknative:
             #intialize native Psi4 jk object
@@ -67,6 +68,8 @@ class jkfactory():
         return self.__eri
     def is_native(self):
         return self.__jkflag
+    def basisset(self):
+        return self.__bset
 
     def J(self,Cocc,Dmat=None,sum_idx=None,out_idx=None):#Dmat and Cocc are expressed on the Ao basis
            nbf = self.__basisobj.nbf()  # C/Den matrix passed in full dimension, slicing 

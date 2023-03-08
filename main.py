@@ -64,7 +64,7 @@ if __name__ == "__main__":
                        default=False, action="store_true")
     parser.add_argument("--select", help="Specify the occ-virt MO weighted dipole moment. (-2; occ_list & virt_list).\
                          Occ/virt_list is a list of numbers separated by semicolon. To include all the virtual mainfold\
-                          set virt_list=-99 (default: 0; 0 & 0)",default="0; 0 & 0", type=str)
+                          set virt_list=-99 (default: "")",default="", type=str)
 
     parser.add_argument("--selective_pert", help="Selective perturbation on", required=False,
                        default=False, action="store_true")
@@ -81,6 +81,11 @@ if __name__ == "__main__":
 
 
     res, wfnBO = run(jkbase,psi4mol,bset,bsetH,args.guess,args.func1,args.func2,args.exmodel,wfn)
+
+    if args.local_basis and (not args.real_time):
+        from rlmo import regional_localize_MO    
+        regional_localize_MO(wfn,wfnBO,cubelist=args.select) # omit '-2' in the string
+
     import rt_mod_new
 
 

@@ -82,12 +82,17 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
     exmodel = wfn_bo['exmodel']
 
     #a minimalistic RT propagation code
-    molist = mo_select.split("&")
-    occlist = molist[0].split(";")
-    occlist = [int(m) for m in occlist]
-    do_weighted = occlist.pop(0)
-    virtlist = molist[1].split(";")
-    virtlist = [int(m) for m in virtlist]
+    if mo_select != "":
+       molist = mo_select.split("&")
+       occlist = molist[0].split(";")
+       occlist = [int(m) for m in occlist]
+       do_weighted = occlist.pop(0)
+       virtlist = molist[1].split(";")
+       virtlist = [int(m) for m in virtlist]
+    else:
+       occlist = -999
+       virtlist = -999
+       do_weighted = -999
 
     #for TNO analysis
     #tlist = args.tlist.split("&")
