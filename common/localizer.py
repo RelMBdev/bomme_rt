@@ -271,7 +271,9 @@ class Localizer():
     def locality(self):
         idx = self.__locality_par.argsort()[::-1]
         return self.__locality_par[idx], self.__occnum[idx]
-
+    def occnum(self):
+        res = np.diagonal(self.__DRo) 
+        return res
     def dump_results(self):
         fo = open('loc_result.txt', "w")
         fo.write("BO basis : ..... %s\n" % str(self.__bobasis))

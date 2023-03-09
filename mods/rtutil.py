@@ -302,3 +302,41 @@ def mo_fock_mid_forwd_eval(Dp_ti,fock_mid_ti_backwd,i,delta_t,fock_base,dipole,\
          raise Exception("Numember of iterations exceeded maxit = %i)" % maxiter)
     # return energy components , the Fock, the forward midpoint fock and the evolved density matrix 
     return Eh_i,Exclow_i,ExcAAhigh_i,ExcAAlow_i,pulse,fock_ti_ao,fock_inter,Dp_ti_dt
+##################################################################
+
+# analysis based on MO-weighted dipole
+
+def dipoleanalysis(dipole,dmat,nocc,occlist,virtlist,debug=False):
+    #virtlist can also contain occupied orbitals !check
+    tot = len(occlist)*len(virtlist)
+    res = np.zeros(tot,dtype=np.complex128)
+    count = 0
+    for i in occlist:
+      for j in virtlist:
+         res[count] = dipole[i-1,j-1]*dmat[j-1,i-1] + dipole[j-1,i-1]*dmat[i-1,j-1]
+         count +=1
+    return res
+##################################################################
+def dipole_selection(dipole,idlist,nocc,occlist,virtlist,odbg=sys.stderr,debug=False):
+ 
+    if debug:
+       odbg.write("Selected occ. Mo: %s \n"% str(occlist))
+       odbg.write("Selected virt. Mo: %s \n"% str(virtlist))
+    offdiag = np.zeros_like(dipole)
+    #diag = numpy.diagonal(tmp)
+    #diagonal = numpy.diagflat(diag)
+    nvirt = dipole.shape[0]-nocc
+    odbg.write("n. virtual orbitals : %i\n" % nvirt)
+    if (idlist == -99):
+      for b in range(nvirt):
+        for j in occlist:
+          offdiag[nocc+b,j-1] = dipole[nocc+b,j-1]
+    else:
+      for b in virtlist:
+        for j in  occlist:
+          offdiag[b-1,j-1] = dipole[b-1,j-1]
+    offdiag=(offdiag+np.conjugate(offdiag.T))
+    #offdiag+=diagonal
+    res = offdiag
+
+    return res

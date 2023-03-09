@@ -377,9 +377,9 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
        virtlist = molist[1].split(";")
        virtlist = [int(m) for m in virtlist]
     else:
-       occlist = -999
-       virtlist = -999
-       do_weighted = -999
+       occlist = None
+       virtlist = None
+       do_weighted = None
 
     #for TNO analysis
     #tlist = args.tlist.split("&")
@@ -520,13 +520,16 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
             print("Dipole matrix is transformed to the MO basis\n")
             print("Local basis: %s\n" % local_basis)
             dip_mo=np.matmul(np.conjugate(C.T),np.matmul(dip_mat,C))
-       if local_basis and (virtlist[0] == -99) and selective_pert:
-            #use occnum to define a virtlist
-            virtlist=[]
-            for m in range(numbas):
-              if np.rint(np.abs(occnum))[m] < 1.0: 
-                virtlist.append(m+1)
-            dip_mo=dipole_selection(dip_mo,-1,ndocc,occlist,virtlist,fo,debug)
+       if local_basis and selective_pert:
+            #use occnum to define a virtlist, occnum exist if local_basis is True, in the same scope
+
+            if isinstance(self.__virtlist,list):
+              if self.__virtlist[0] == -99: 
+                 virtlist=[]
+                 for m in range(numbas):
+                   if np.rint(np.abs(occnum))[m] < 1.0: 
+                     virtlist.append(m+1)
+                 dip_mo=dipole_selection(dip_mo,-1,ndocc,occlist,virtlist,fo,debug)
        elif selective_pert:
              dip_mo=dipole_selection(dip_mo,virtlist[0],ndocc,occlist,virtlist,fo,debug)
            

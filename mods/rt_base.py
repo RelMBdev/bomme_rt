@@ -27,8 +27,8 @@ class real_time():
       self.__occlist  = occlist
       self.__virtlist = virtlist
       self.__locbasis = local_basis
+      self.__localbasobj = None
       self.__exA_only = exA_only
-      self.__occnum  = None
       self.__Dp       = None
       self.__Fock_mid = Fock_init
       self.__ovapm    = Smat # it can represent either overlap of AO basis functions or BO b. funcs
@@ -67,18 +67,17 @@ class real_time():
               except scipy.linalg.LinAlgError:
                 print("Error in np.linalg.inv")
      
-              localbas=Localizer(Dinit,Smat,nbf_A)
-              localbas.localize()
+              self.__localbasobj=Localizer(Dinit,Smat,nbf_A)
+              self.__localbasobj.localize()
               #unsorted orbitals
-              unsorted_orbs=localbas.make_orbitals()
+              unsorted_orbs=self.__localbasobj.make_orbitals()
               #the projector P
               Phat=np.matmul(Smat[:,:nbf_A],np.matmul(SAA_inv,Smat[:nbf_A,:]))
               #The RLMO are ordered
               # by descending value of the locality parameter.
-              sorted_orbs = localbas.sort_orbitals(Phat)
+              sorted_orbs = self.__localbasobj.sort_orbitals(Phat)
               #the occupation number and the locality measure
-              locality,occnum=localbas.locality()
-              self.__occnum = occnum
+              locality,occnum=self.__localbasobj.locality()
               #save the localization parameters and the occupation numbers  
               np.savetxt('locality_rlmo.out', np.c_[locality,occnum], fmt='%.12e')
               #check the occupation number of ndimA=nbf_A MOs (of A).
@@ -96,6 +95,10 @@ class real_time():
 
     def dipmat(self):
         return self.__dipmat
+    def occlist(self):
+        return self.__occlist
+    def virtlist(self):
+        return self.__virtlist
 
     def init_boost(self,selective_pert=False,debug=False):
        dip_mat  = self.__dipmat
@@ -126,16 +129,19 @@ class real_time():
             print("Local basis: %s\n" % self.__locbasis)
             dip_mo=np.matmul(np.conjugate(self.__Cmat.T),np.matmul(dip_mat,self.__Cmat))
 
-       if self.__locbasis and (self.__virtlist[0] == -99) and selective_pert:
-            #use occnum to define a virtlist
-            virtlist=[]
-            for m in range(numbas):
-              if np.rint(np.abs(self.__occnum))[m] < 1.0: 
-                virtlist.append(m+1)
-            dip_mo=dipole_selection(dip_mo,-1,ndocc,occlist,virtlist,self.__outfile,debug)
-            self.__virtlist = virtlist
+       if self.__locbasis and selective_pert:
+            #use occnum to define a virtlist -> occnum exist only if local_basis has ben used
+            if isinstance(self.__virtlist,list):
+              if self.__virtlist[0] == -99: 
+                 occ_number = self.__localbasobj.occnum()
+                 virtlist=[]
+                 for m in range(numbas):
+                   if np.rint(np.abs(occ_number))[m] < 1.0: 
+                     virtlist.append(m+1)
+                 dip_mo=rtutil.dipole_selection(dip_mo,-1,ndocc,occlist,virtlist,self.__outfile,debug) # import from ?
+                 self.__virtlist = virtlist
        elif selective_pert:
-             dip_mo=dipole_selection(dip_mo,virtlist[0],ndocc,occlist,virtlist,self.__outfile,debug)
+             dip_mo=rtutil.dipole_selection(dip_mo,virtlist[0],ndocc,occlist,virtlist,self.__outfile,debug)
            
        u0 = rtutil.exp_opmat(dip_mo,np.float_(-k))
        Dp_init= np.matmul(u0,np.matmul(self.__Dp,np.conjugate(u0.T)))

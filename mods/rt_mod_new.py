@@ -28,44 +28,6 @@ from localizer import Localizer
 import rtutil
 ##################################################################
 
-# analysis based on MO-weighted dipole
-
-def dipoleanalysis(dipole,dmat,nocc,occlist,virtlist,debug=False):
-    #virtlist can also contain occupied orbitals !check
-    tot = len(occlist)*len(virtlist)
-    res = np.zeros(tot,dtype=np.complex128)
-    count = 0
-    for i in occlist:
-      for j in virtlist:
-         res[count] = dipole[i-1,j-1]*dmat[j-1,i-1] + dipole[j-1,i-1]*dmat[i-1,j-1]
-         count +=1
-    return res
-##################################################################
-def dipole_selection(dipole,idlist,nocc,occlist,virtlist,odbg=sys.stderr,debug=False):
-    
-    if debug:
-       odbg.write("Selected occ. Mo: %s \n"% str(occlist))
-       odbg.write("Selected virt. Mo: %s \n"% str(virtlist))
-    offdiag = np.zeros_like(dipole)
-    #diag = numpy.diagonal(tmp)
-    #diagonal = numpy.diagflat(diag)
-    nvirt = dipole.shape[0]-nocc
-    odbg.write("n. virtual orbitals : %i\n" % nvirt)
-    if (idlist == -99):
-      for b in range(nvirt):
-        for j in occlist:
-          offdiag[nocc+b,j-1] = dipole[nocc+b,j-1]
-    else:
-      for b in virtlist:
-        for j in  occlist:
-          offdiag[b-1,j-1] = dipole[b-1,j-1]
-    offdiag=(offdiag+np.conjugate(offdiag.T))
-    #offdiag+=diagonal
-    res = offdiag
-
-    return res
-##################################################################
-
 # mo_select : string containing two substrings "-2; list_occ & list_vist"
 # selective_pert : bool.  Turn on selective perturbation. See Repisky M et al 2015
 # local_basis : bool . Use a localized basis instead of ground-state MOs
@@ -90,9 +52,9 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
        virtlist = molist[1].split(";")
        virtlist = [int(m) for m in virtlist]
     else:
-       occlist = -999
-       virtlist = -999
-       do_weighted = -999
+       occlist = None
+       virtlist = None
+       do_weighted = None
 
     #for TNO analysis
     #tlist = args.tlist.split("&")
@@ -179,8 +141,8 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
 
     # in an orthonormal basis Dtilde should be diagonal with oo=1, vv=0
     ODtilde=np.matmul(C_inv,np.matmul(Dtilde,C_inv.T))
-    Dp_test = rt_prop.get_Dmat()
-    print("D[BO] is diagonal in the orbital basis: %s" % np.allclose(Dp_test,ODtilde,atol=1.0e-14))
+    Dp_0 = rt_prop.get_Dmat()   # the density matrix in the basis of MOs (diagonal : [1]_occ , [0]_virt)
+    print("D[BO] is diagonal in the orbital basis: %s" % np.allclose(Dp_0,ODtilde,atol=1.0e-14))
 
 
     #nuclear dipole for non-homonuclear molecules
@@ -203,7 +165,7 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
     print("analytic : %i" % analytic)
     if (analytic):
        # the returned matrices are not used anyway 
-       Dp_init_test , Da_test = rt_prop.init_boost() 
+       Dp_init_test , Da_test = rt_prop.init_boost(selective_pert,debug=True) 
     
     #containers
     field_list = []
@@ -251,12 +213,14 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
 
 
     #weighted dipole
-    if (do_weighted == -2):
-      if virtlist[0] ==-99 and ((not args.locbasis ) or (not args.selective_pert)) :
+    if (do_weighted == -2) and isinstance(virtlist,list):
+      if virtlist[0] ==-99 and ((not local_basis ) or (not selective_pert)) :
         virtlist=[]
         for m in range(ndocc,numbas):
             virtlist.append(m+1)
-      res = dipoleanalysis(dipmo_mat,Dp_0,ndocc,occlist,virtlist,debug)
+      else:
+        virtlist = rt_prop.virtlist()
+      res = rtutil.dipoleanalysis(dipmo_mat,Dp_0,ndocc,occlist,virtlist,debug)
       weighted_dip.append(res)
 
     func_t0 = rt_prop.get_extfield() 
@@ -313,7 +277,7 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
 
         if (do_weighted == -2):
           #weighted dipole 
-          res = dipoleanalysis(dipmo_mat,Dp_ti,ndocc,occlist,virtlist,debug)
+          res = rtutil.dipoleanalysis(dipmo_mat,Dp_ti,ndocc,occlist,virtlist,debug)
           weighted_dip.append(res)
         
         func_ti = rt_prop.get_extfield()
