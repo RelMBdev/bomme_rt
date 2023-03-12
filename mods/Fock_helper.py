@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 import psi4
 import scipy.linalg
@@ -30,7 +31,7 @@ class datacommon():
         return self.__Ccoef
 
 class jkfactory():
-    def __init__(self,bset,molobj,jknative=True,scf_type='DIRECT',eri=None,real_time=False):
+    def __init__(self,bset,molobj,jknative=True,scf_type='DIRECT',eri=None,real_time=False,debug=False,out=sys.stderr):
         self.__jkflag = jknative
         self.__basisobj = bset
         self.__scftype = scf_type
@@ -38,6 +39,8 @@ class jkfactory():
         self.__eri_axis = None
         self.__jk = None
         self.__bset = bset
+        self.__debug = debug
+        self.__outdbg = out
         self.__rtfit = real_time # use density fitting the get the correction to the real-time K matrix when jkclass is on
         if jknative:
             #intialize native Psi4 jk object
@@ -128,6 +131,8 @@ class jkfactory():
                #print(self.__eri.shape)
                #print("idx and Idx")
                #print(idx,Idx)
+               if self.__debug:
+                  self.__outdbg.write("debug: eri-density contraction\n")
                if not (self.__eri_axis < 4):
                   eri = self.__eri[o_id[0]:o_id[1],o_id[2]:o_id[3],i_id[0]:i_id[1],i_id[2]:i_id[3]]
                   Jmat=np.einsum('pqrs,rs->pq', eri, Dmat[i_id[0]:i_id[1],i_id[2]:i_id[3]])
@@ -188,24 +193,33 @@ class jkfactory():
                Kmat=np.array(self.__jk.K()[0])[o_id[0]:o_id[1],o_id[2]:o_id[3]] #
                # the native jkclass will use real mol. orbital (nat orbitals of D.real) to compute K, neglecting
                # the imaginary part of D (D.imag)
+               #print("Dmat is complex %s\n" %  np.iscomplexobj(Dmat) )
+               #print("fitt rt-imag(K) %s\n" % self.__rtfit)
                if self.__rtfit and np.iscomplexobj(Dmat) :
-                  # print("debug: fitting the residual K.imag")
+                  #print("K real (%i,%i)\n" % (Kmat.shape[0],Kmat.shape[1]) )
+                  if self.__debug:
+                     self.__outdbg.write("debug: fitting the residual K.imag\n")
+                  #Dcheck = Dmat[i_id[0]:i_id[1],i_id[2]:i_id[3]]
+                  #print("D (%i,%i), DAA(%i,%i)\n" % (Dmat.shape[0],Dmat.shape[1],Dcheck.shape[0],Dcheck.shape[1]))
+                  #norma =np.linalg.norm(Dcheck.imag,'fro')
+                  #print("2-norm of D_imag[AA] : %.8f" % norma)
                   if not (self.__eri_axis < 4):
                      raise Exception("need fitted 3-index tensor here") 
                   Z_Qqr = np.einsum('Qrs,sq->Qrq', self.__eri[:,o_id[2]:o_id[3],i_id[0]:i_id[1]], (Dmat.imag)[i_id[0]:i_id[1],i_id[2]:i_id[3]])
                   tmp = np.einsum('Qpq,Qrq->pr', self.__eri[:,o_id[0]:o_id[1],i_id[2]:i_id[3]], Z_Qqr)
-                  Ktmp = np.zeros((nbf,nbf),dtype=np.complex128)
-                  Ktmp.real = Kmat
-                  Ktmp.imag = tmp
-                  Kmat = np.asarray(Ktmp)
+                  #print("K imag (%i,%i)\n" % (tmp.shape[0],tmp.shape[1]) )
+                  Kmat = Kmat +1.0j*tmp
             elif (self.__eri is not None):
                if not self.__eri_axis < 4:
+                  if self.__debug:
+                     self.__outdbg.write("debug: use 4-index eri contraction\n")
                   #'prqs,rs->pq'
                   eri = self.__eri[o_id[0]:o_id[1],i_id[0]:i_id[1],o_id[2]:o_id[3],i_id[2]:i_id[3]]
                   #print("%i:%i , %i:%i, %i:%i, %i:%i" % (o_id[0],o_id[1],i_id[0],i_id[1],o_id[2],o_id[3],i_id[2],i_id[3]))
                   Kmat=np.einsum('prqs,rs->pq', eri, Dmat[i_id[0]:i_id[1],i_id[2]:i_id[3]])
                else:
-                  #print("debug fitted_eri Kmat")
+                  if self.__debug: 
+                     self.__outdbg.write("debug: use 3-index eri contraction\n")
                   Z_Qqr = np.einsum('Qrs,sq->Qrq', self.__eri[:,o_id[2]:o_id[3],i_id[0]:i_id[1]], Dmat[i_id[0]:i_id[1],i_id[2]:i_id[3]])
                   Kmat = np.einsum('Qpq,Qrq->pr', self.__eri[:,o_id[0]:o_id[1],i_id[2]:i_id[3]], Z_Qqr)
             return Kmat
@@ -483,7 +497,12 @@ class fock_factory():
              # two_el_bo is the two-electron term (J+Vxc) expressed on the BO basis
              two_el_bo = np.matmul(U.T,np.matmul( ( 2.0*J+Vxc[0] ),U))
              
-             res = H_bo + two_el_bo 
+             res = H_bo + two_el_bo
+             #print("VxcAAhigh is complex: %s\n" % np.iscomplexobj(VxcAA_high[0]))
+             #print("VxcAAhigh - VxcAAlow is complex: %s\n" % np.iscomplexobj(VxcAA_high[0] - VxcAA_low[0]))
+             if np.iscomplexobj( VxcAA_high[0] -VxcAA_low[0]) and np.isrealobj(res):
+                res = res + 1.0j*np.zeros_like(res)
+                 
              res[:basis_acc.nbf(),:basis_acc.nbf()] += (VxcAA_high[0] - VxcAA_low[0])
              return Eh, Vxc[1], VxcAA_low[1], VxcAA_high[1], res
           else:
@@ -492,6 +511,8 @@ class fock_factory():
              two_el_bo = np.matmul(U.T,np.matmul( ( 2.0*J+Vxc ),U))
              
              res = H_bo + two_el_bo 
+             if np.iscomplexobj( VxcAA_high -VxcAA_low) and np.isrealobj(res):
+                res = res + 1.0j*np.zeros_like(res)
              res[:basis_acc.nbf(),:basis_acc.nbf()] += (VxcAA_high - VxcAA_low)
              return res
    

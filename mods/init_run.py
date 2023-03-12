@@ -189,7 +189,7 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
     
     print("eri is instance: %s\n" % type(eri)) 
     from Fock_helper import jkfactory
-    jkbase = jkfactory(bset,molobj,jkflag,scf_type,eri=eri)
+    jkbase = jkfactory(bset,molobj,jkflag,scf_type,eri=eri,real_time=fitt_Krt)
 
     return bset,bsetH, moltot,molobj,wfn,jkbase
 
