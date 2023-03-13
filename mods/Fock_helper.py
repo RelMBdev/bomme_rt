@@ -222,6 +222,13 @@ class jkfactory():
                      self.__outdbg.write("debug: use 3-index eri contraction\n")
                   Z_Qqr = np.einsum('Qrs,sq->Qrq', self.__eri[:,o_id[2]:o_id[3],i_id[0]:i_id[1]], Dmat[i_id[0]:i_id[1],i_id[2]:i_id[3]])
                   Kmat = np.einsum('Qpq,Qrq->pr', self.__eri[:,o_id[0]:o_id[1],i_id[2]:i_id[3]], Z_Qqr)
+            if self.__debug:
+                # check the trace of K*Dmat and the 2-norm of imag of K
+                if isinstance(Dmat,np.ndarray):
+                    trace = np.matmul(Kmat,Dmat[o_id[0]:o_id[1],o_id[2]:o_id[3]])
+                    trace = np.trace(trace)
+                    norm = np.linalg.norm(Dmat.imag,'fro')
+                    self.__outdbg.write("trace of K*D : %.4e+%.4ei | 2-norm of imag(K) : %.5e\n" % (trace.real,trace.imag,norm))
             return Kmat
        
 class dft_xc():
@@ -289,6 +296,10 @@ class fock_factory():
           self.__basis = basisobj
           self.__func = funcname
           self.__exmodel = exmodel
+          self.__Vxc = None
+          self.__Vxc_low = None
+          self.__Vxc_high = None
+          self.__Coul = None
           self.__restricted = True #default
           #self.__basis_h = None # the basis of the 'high-level' subsys
           self.__jkfact = jk_fact
@@ -409,7 +420,6 @@ class fock_factory():
               raise Exception("Cocc and D are both None")
           elif not isinstance(Cocc,np.ndarray) and self.__jkfact.is_native():
                ndocc = int(np.rint(np.trace(np.matmul(Dmat,self.__S)).real))
-               Cocc = np.zeros((Dmat.shape[0],ndocc))
  #             print(ndocc)
  #             diagonalize to get Cocc
                den_op = np.matmul(self.__S,np.matmul(Dmat.real,self.__S))
@@ -446,7 +456,6 @@ class fock_factory():
               raise Exception("Cocc and D are both None")
           elif not isinstance(Cocc,np.ndarray) and self.__jkfact.is_native():
                ndocc = int(np.rint(np.trace(np.matmul(Dmat,self.__S)).real))
-               Cocc = np.zeros((Dmat.shape[0],ndocc))
           #    print(ndocc)
           #    diagonalize to get Cocc
                den_op = np.matmul(self.__S,np.matmul(Dmat.real,self.__S))
@@ -490,7 +499,7 @@ class fock_factory():
              Eh = 2.00*np.trace( np.matmul(J,Dmat_ao) )
           else:
              Eh = 2.00*np.trace( np.matmul(Cocc_ao.T,np.matmul(J,Cocc_ao) ) )
-
+          self.__Coul = J # debug  on the AO basis
           if return_ene:
              # if return_ene=True in get_xcpot() a tuple will be returned
 
@@ -504,6 +513,9 @@ class fock_factory():
                 res = res + 1.0j*np.zeros_like(res)
                  
              res[:basis_acc.nbf(),:basis_acc.nbf()] += (VxcAA_high[0] - VxcAA_low[0])
+             self.__Vxc = Vxc[0]
+             self.__Vxc_low = VxcAA_low[0]
+             self.__Vxc_high = VxcAA_high[0]
              return Eh, Vxc[1], VxcAA_low[1], VxcAA_high[1], res
           else:
 
@@ -514,8 +526,23 @@ class fock_factory():
              if np.iscomplexobj( VxcAA_high -VxcAA_low) and np.isrealobj(res):
                 res = res + 1.0j*np.zeros_like(res)
              res[:basis_acc.nbf(),:basis_acc.nbf()] += (VxcAA_high - VxcAA_low)
+             self.__Vxc = Vxc
+             self.__Vxc_low = VxcAA_low
+             self.__Vxc_high = VxcAA_high
              return res
    
+    def get_Fterm(self,kind = 'core'):
+        if kind == 'core':
+            res = self.__Hcore
+        elif kind == 'vxc':
+            res = self.__Vxc
+        elif kind == 'vxc_low':
+            res = self.__Vxc_low
+        elif kind == 'vxc_high':
+            res = self.__Vxc_high
+        elif kind =='coul':   
+            res = self.__Coul
+        return res
     # define a general function to simulate function overloading
     def get_fock(self,Cocc=None,Dmat=None,func_acc=None,basis_acc=None,U=None,return_ene=False):
 

@@ -77,7 +77,7 @@ if __name__ == "__main__":
 
     # call functions here    
     bset,bsetH, molelecule_str, psi4mol, wfn, jkbase = initialize(args.jkclass,args.scf_type,args.obs1,args.obs2,args.geomA,\
-                   args.func1,args.func2,args.charge,args.numpy_mem,args.eri,args.fitt_HF_exch)
+                   args.func1,args.func2,args.charge,args.numpy_mem,args.eri,args.fitt_HF_exch,args.debug)
 
 
     res, wfnBO = run(jkbase,psi4mol,bset,bsetH,args.guess,args.func1,args.func2,args.exmodel,wfn)

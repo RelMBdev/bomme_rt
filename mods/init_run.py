@@ -13,7 +13,7 @@ if modpaths is not None :
 from molecule import Molecule, gparser
 
 def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
-                charge,numpy_memory=8,eri=None,fitt_Krt=False):
+                charge,numpy_memory=8,eri=None,fitt_Krt=False,debug=False):
     #if (not jkflag) and (not scf_type == 'DIRECT'):
     #    raise Exception("Bad keyword combination: scf_type and jkclass mode \n")
     # scf_type controls the type of scf type in the initialization (the GS density
@@ -189,7 +189,7 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
     
     print("eri is instance: %s\n" % type(eri)) 
     from Fock_helper import jkfactory
-    jkbase = jkfactory(bset,molobj,jkflag,scf_type,eri=eri,real_time=fitt_Krt)
+    jkbase = jkfactory(bset,molobj,jkflag,scf_type,eri=eri,real_time=fitt_Krt,debug=debug)
 
     return bset,bsetH, moltot,molobj,wfn,jkbase
 
