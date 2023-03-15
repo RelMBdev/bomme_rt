@@ -133,7 +133,8 @@ class jkfactory():
                else:  
                   X_Q = np.einsum('Qpq,pq->Q', self.__eri[:,i_id[0]:i_id[1],i_id[2]:i_id[3]], Dmat[i_id[0]:i_id[1],i_id[2]:i_id[3]])
                   Jmat = np.einsum('Qpq,Q->pq', self.__eri, X_Q)[o_id[0]:o_id[1],o_id[2]:o_id[3]]
-
+           else:
+               Jmat = None
            return Jmat      
 
 
@@ -218,6 +219,10 @@ class jkfactory():
             #        trace = np.trace(trace)
             #        norm = np.linalg.norm(Dmat.imag,'fro')
             #        self.__outdbg.write("trace of K*D : %.4e+%.4ei | 2-norm of imag(K) : %.5e\n" % (trace.real,trace.imag,norm))
+            
+            else:
+                Kmat = None
+
             return Kmat
        
 class dft_xc():

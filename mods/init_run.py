@@ -194,7 +194,7 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
           print("eri shape [%i,%i,%i]" % (eri_tensor.shape[0],eri_tensor.shape[1],eri_tensor.shape[2]))
           print("eri n. axis: %i" % len(eri_tensor.shape))
     else:
-          print("using native psi4 JK class, real-time  imag. HF exchange required: %s\n" % rt_HF_iexch)
+          print("Use native Psi4 JK class: %s , real-time  imag. HF exchange required: %s\n" % (jkflag,rt_HF_iexch))
           eri_tensor = None
 
     # the following conditions, if met, allow to set, in a typical BOMME configuration (i.e high-level/low-level func mixture)

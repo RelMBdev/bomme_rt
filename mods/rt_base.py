@@ -32,7 +32,7 @@ class real_time():
       self.__Dp       = None
       self.__Fock_mid = Fock_init
       self.__ovapm    = Smat # it can represent either overlap of AO basis functions or BO b. funcs
-      self.__Cmat  = Cmat    # Cmat contains MO coefficients (either AO or BO)
+      self.__Cmat  = Cmat    # Cmat contains MO coefficients (either on AO basis or BO basis)
       self.__dipmat = None
       self.__perpdip = []
       self.__Umat     = U
@@ -85,6 +85,7 @@ class real_time():
               print("ndocc orbitals (A) after localization: %i\n" % occA)
               #set the sorted as new basis 
               C=sorted_orbs
+              self.__Cmat = C
               #use the density corresponding to (sorted) localized orbitals
               Dp_0 = np.diagflat(occnum)
       else:
