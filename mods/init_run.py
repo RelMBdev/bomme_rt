@@ -13,9 +13,9 @@ if modpaths is not None :
 from molecule import Molecule, gparser
 
 def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
-                charge,numpy_memory=8,eri=None,fitt_Krt=False,debug=False):
-    #if (not jkflag) and (not scf_type == 'DIRECT'):
-    #    raise Exception("Bad keyword combination: scf_type and jkclass mode \n")
+                charge,numpy_memory=8,eri=None,rt_HF_iexch=False, exch_model=0, debug=False):
+    # rt_HF_iexch flag determines if the imaginary part of the exchange 
+    # is accounted in the rt-evolution
     # scf_type controls the type of scf type in the initialization (the GS density
     # is optionally used as guess density) and the type of J (K) matrix ('direct',
     # 'mem_df', 'disk_df', 'pk' integrals)
@@ -102,7 +102,17 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
     #mol_wfn.basisset().print_detail_out()
 
     ene,wfn=psi4.energy(func_l ,return_wfn=True)
-
+    #warning if the low-level functional is hybrid/lrc/need HF exch
+    V_pot = wfn.V_potential()
+    
+    if func_l == 'hf':     
+         fun_low_hfexch = True
+    if (V_pot is not None):
+        if V_pot.functional().is_x_hybrid() :
+         fun_low_hfexch = True
+         print("The low-level-theory functional requires HF exch")
+        else:
+         fun_low_hfexch = False
     # mHigh is the portion of the system treated at the higher level
 
     mHigh=psi4.geometry(molA.geometry() +"symmetry c1" +"\n" +"no_reorient" +"\n" +"no_com")
@@ -134,9 +144,9 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
     print("functions in subsys1: %i" % nbfA)
 
     mints = psi4.core.MintsHelper(bset)
-    if (eri != 'fit') and (fitt_Krt):
+    if (eri != 'fit') and (rt_HF_iexch) and (not fun_low_hfexch) and (not jkflag):
         raise Exception("Fitted K imag-part required -> fit eri \n")
-    if eri=='nofit':
+    if eri=='nofit' and (not jkflag):
        # Run a quick check to make sure everything will fit into memory
        I_Size = (numbas**4) * 8.e-9
        print("\nSize of the ERI tensor will be %4.2f GB." % I_Size)
@@ -147,11 +157,11 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
            psi4.core.clean()
            raise Exception("Estimated memory utilization (%4.2f GB) exceeds numpy_memory limit of %4.2f GB." % (memory_footprint, numpy_memory))
        #Get Eri (2-electron repulsion integrals)
-       eri=np.array(mints.ao_eri())
-       print("eri n. axis: %i" % len(eri.shape))
+       eri_tensor=np.array(mints.ao_eri())
+       print("eri n. axis: %i" % len(eri_tensor.shape))
     elif eri=='fit':
-           
-          aux_basis = psi4.core.BasisSet.build(molobj, "DF_BASIS_SCF", "", "JKFIT", psi4.core.get_global_option('basis'))
+          #print("HERE set aux_basis") 
+          aux_basis = psi4.core.BasisSet.build(molobj, "DF_BASIS_SCF", "", "RIFIT", psi4.core.get_global_option('basis'))
           n_aux = aux_basis.nbf()
 
           # Run a quick check to make sure everything will fit into memory
@@ -180,16 +190,34 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
           metric = np.squeeze(metric)
 
           # Contract Ppq & Metric to build Qpq
-          eri = np.einsum('QP,Ppq->Qpq', metric, Ppq)
-          print("eri shape [%i,%i,%i]" % (eri.shape[0],eri.shape[1],eri.shape[2]))
-          print("eri n. axis: %i" % len(eri.shape))
+          eri_tensor = np.einsum('QP,Ppq->Qpq', metric, Ppq)
+          print("eri shape [%i,%i,%i]" % (eri_tensor.shape[0],eri_tensor.shape[1],eri_tensor.shape[2]))
+          print("eri n. axis: %i" % len(eri_tensor.shape))
     else:
-          print("invalid keyword, using native psi4 JK class")
-          eri = None
+          print("using native psi4 JK class, real-time  imag. HF exchange required: %s\n" % rt_HF_iexch)
+          eri_tensor = None
+
+    # the following conditions, if met, allow to set, in a typical BOMME configuration (i.e high-level/low-level func mixture)
+    # a jkfactory and Fock such that the native Psi4 JKclass is employed to get the real part of J and K matrices and
+    # and 'hopefully' a shrinked 4-indiex eri tensor (corresponding to the AA subblock of the basis set) is used to get the
+    # imaginary part of the HF exch if needed.
+    if (not fun_low_hfexch) and eri=='nofit' and exch_model == 0 and jkflag :  # most common case the exchange_model = 0
+       mints_AA = psi4.core.MintsHelper(bsetH) # the 4-index eri object is retrived on the AA sub-basis
+       # Run a quick check to make sure everything will fit into memory
+       I_AA_Size = (nbfA**4) * 8.e-9
+       print("\nSize of the ERI tensor (AA block) will be %4.2f GB." % I_AA_Size)
+       
+       # Estimate memory usage
+       memory_footprint = I_AA_Size * 1.5
+       if I_AA_Size > numpy_memory:
+           psi4.core.clean()
+           raise Exception("Estimated memory utilization (%4.2f GB) exceeds numpy_memory limit of %4.2f GB." % (memory_footprint, numpy_memory))
+       #Get Eri (2-electron repulsion integrals)
+       eri_tensor=np.array(mints_AA.ao_eri())
     
-    print("eri is instance: %s\n" % type(eri)) 
+    print("eri is instance: %s\n" % type(eri_tensor)) 
     from Fock_helper import jkfactory
-    jkbase = jkfactory(bset,molobj,jkflag,scf_type,eri=eri,real_time=fitt_Krt,debug=debug)
+    jkbase = jkfactory(bset,molobj,jkflag,scf_type,eri=eri_tensor,real_time=rt_HF_iexch,debug=debug)
 
     return bset,bsetH, moltot,molobj,wfn,jkbase
 

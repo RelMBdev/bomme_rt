@@ -41,7 +41,7 @@ class jkfactory():
         self.__bset = bset
         self.__debug = debug
         self.__outdbg = out
-        self.__rtfit = real_time # use density fitting the get the correction to the real-time K matrix when jkclass is on
+        self.__rtfit = real_time # use fitted integral / full 4-index eri the get the correction to the real-time K matrix when jkclass is on
         if jknative:
             #intialize native Psi4 jk object
             if (scf_type=='DIRECT' or scf_type=='PK'): 
@@ -62,9 +62,9 @@ class jkfactory():
             self.__jk = jk
 
         if (eri is not None):
-            print("doing tensor contraction")
+            print("jkfactory -> eri tensor provided, real-time HF exch required: %s" % real_time)
             if self.__jkflag:
-                print("JK psi4 class being in use!!")
+                print("jkfactory -> JK psi4 class being in use!!")
             self.__eri_axis  = len(eri.shape)
 
     def eri(self):
@@ -73,6 +73,8 @@ class jkfactory():
         return self.__jkflag
     def basisset(self):
         return self.__bset
+    #def set_outfile(self):
+    #    self.__outdbg = fout)
 
     def J(self,Cocc,Dmat=None,sum_idx=None,out_idx=None):#Dmat and Cocc are expressed on the Ao basis
            nbf = self.__basisobj.nbf()  # C/Den matrix passed in full dimension, slicing 
@@ -114,10 +116,6 @@ class jkfactory():
                     o_id.append(subel)                    
            else:
              print("check contraction indices")  
-           #print("sum indices for J")         
-           #print(i_id)
-           #print("output indices for J")
-           #print(o_id)
            if self.__jkflag :
               if not isinstance(Cocc,np.ndarray):
                  raise Exception("Cocc is not np.ndarray")
@@ -127,12 +125,8 @@ class jkfactory():
               Jmat=np.array(self.__jk.J()[0])[o_id[0]:o_id[1],o_id[2]:o_id[3]]#copy into J
 
            elif (self.__eri is not None):
-               #print("nbf: %i\n" % nbf)
-               #print(self.__eri.shape)
-               #print("idx and Idx")
-               #print(idx,Idx)
-               if self.__debug:
-                  self.__outdbg.write("debug: eri-density contraction\n")
+               #if self.__debug:
+               #   self.__outdbg.write("debug: eri-density contraction\n")
                if not (self.__eri_axis < 4):
                   eri = self.__eri[o_id[0]:o_id[1],o_id[2]:o_id[3],i_id[0]:i_id[1],i_id[2]:i_id[3]]
                   Jmat=np.einsum('pqrs,rs->pq', eri, Dmat[i_id[0]:i_id[1],i_id[2]:i_id[3]])
@@ -180,10 +174,7 @@ class jkfactory():
                      o_id.append(subel)                    
             else:
               print("check contraction indices")  
-            #print("sum indices for K")         
-            #print(i_id)
-            #print("output indices for K")
-            #print(o_id)
+            
             if self.__jkflag :
                if not isinstance(Cocc,np.ndarray):
                   raise Exception("Cocc is not np.ndarray")
@@ -193,42 +184,40 @@ class jkfactory():
                Kmat=np.array(self.__jk.K()[0])[o_id[0]:o_id[1],o_id[2]:o_id[3]] #
                # the native jkclass will use real mol. orbital (nat orbitals of D.real) to compute K, neglecting
                # the imaginary part of D (D.imag)
-               #print("Dmat is complex %s\n" %  np.iscomplexobj(Dmat) )
-               #print("fitt rt-imag(K) %s\n" % self.__rtfit)
                if self.__rtfit and np.iscomplexobj(Dmat) :
                   #print("K real (%i,%i)\n" % (Kmat.shape[0],Kmat.shape[1]) )
-                  if self.__debug:
-                     self.__outdbg.write("debug: fitting the residual K.imag\n")
-                  #Dcheck = Dmat[i_id[0]:i_id[1],i_id[2]:i_id[3]]
-                  #print("D (%i,%i), DAA(%i,%i)\n" % (Dmat.shape[0],Dmat.shape[1],Dcheck.shape[0],Dcheck.shape[1]))
-                  #norma =np.linalg.norm(Dcheck.imag,'fro')
-                  #print("2-norm of D_imag[AA] : %.8f" % norma)
+                  #if self.__debug:
+                  #   self.__outdbg.write("debug: fitting the residual K.imag\n")
                   if not (self.__eri_axis < 4):
-                     raise Exception("need fitted 3-index tensor here") 
-                  Z_Qqr = np.einsum('Qrs,sq->Qrq', self.__eri[:,o_id[2]:o_id[3],i_id[0]:i_id[1]], (Dmat.imag)[i_id[0]:i_id[1],i_id[2]:i_id[3]])
-                  tmp = np.einsum('Qpq,Qrq->pr', self.__eri[:,o_id[0]:o_id[1],i_id[2]:i_id[3]], Z_Qqr)
-                  #print("K imag (%i,%i)\n" % (tmp.shape[0],tmp.shape[1]) )
+                     #raise Exception("need fitted 3-index tensor here") 
+                     eri = self.__eri[o_id[0]:o_id[1],i_id[0]:i_id[1],o_id[2]:o_id[3],i_id[2]:i_id[3]]
+                     #print("%i:%i , %i:%i, %i:%i, %i:%i" % (o_id[0],o_id[1],i_id[0],i_id[1],o_id[2],o_id[3],i_id[2],i_id[3]))
+                     tmp=np.einsum('prqs,rs->pq', eri, Dmat.imag[i_id[0]:i_id[1],i_id[2]:i_id[3]])
+                  else:   
+                   Z_Qqr = np.einsum('Qrs,sq->Qrq', self.__eri[:,o_id[2]:o_id[3],i_id[0]:i_id[1]], (Dmat.imag)[i_id[0]:i_id[1],i_id[2]:i_id[3]])
+                   tmp = np.einsum('Qpq,Qrq->pr', self.__eri[:,o_id[0]:o_id[1],i_id[2]:i_id[3]], Z_Qqr)
+                   #print("K imag (%i,%i)\n" % (tmp.shape[0],tmp.shape[1]) )
                   Kmat = Kmat +1.0j*tmp
             elif (self.__eri is not None):
                if not self.__eri_axis < 4:
-                  if self.__debug:
-                     self.__outdbg.write("debug: use 4-index eri contraction\n")
+                  #if self.__debug:
+                  #   self.__outdbg.write("debug: use 4-index eri contraction\n")
                   #'prqs,rs->pq'
                   eri = self.__eri[o_id[0]:o_id[1],i_id[0]:i_id[1],o_id[2]:o_id[3],i_id[2]:i_id[3]]
                   #print("%i:%i , %i:%i, %i:%i, %i:%i" % (o_id[0],o_id[1],i_id[0],i_id[1],o_id[2],o_id[3],i_id[2],i_id[3]))
                   Kmat=np.einsum('prqs,rs->pq', eri, Dmat[i_id[0]:i_id[1],i_id[2]:i_id[3]])
                else:
-                  if self.__debug: 
-                     self.__outdbg.write("debug: use 3-index eri contraction\n")
+                  #if self.__debug: 
+                  #   self.__outdbg.write("debug: use 3-index eri contraction\n")
                   Z_Qqr = np.einsum('Qrs,sq->Qrq', self.__eri[:,o_id[2]:o_id[3],i_id[0]:i_id[1]], Dmat[i_id[0]:i_id[1],i_id[2]:i_id[3]])
                   Kmat = np.einsum('Qpq,Qrq->pr', self.__eri[:,o_id[0]:o_id[1],i_id[2]:i_id[3]], Z_Qqr)
-            if self.__debug:
+            #if self.__debug:
                 # check the trace of K*Dmat and the 2-norm of imag of K
-                if isinstance(Dmat,np.ndarray):
-                    trace = np.matmul(Kmat,Dmat[o_id[0]:o_id[1],o_id[2]:o_id[3]])
-                    trace = np.trace(trace)
-                    norm = np.linalg.norm(Dmat.imag,'fro')
-                    self.__outdbg.write("trace of K*D : %.4e+%.4ei | 2-norm of imag(K) : %.5e\n" % (trace.real,trace.imag,norm))
+            #    if isinstance(Dmat,np.ndarray):
+            #        trace = np.matmul(Kmat,Dmat[o_id[0]:o_id[1],o_id[2]:o_id[3]])
+            #        trace = np.trace(trace)
+            #        norm = np.linalg.norm(Dmat.imag,'fro')
+            #        self.__outdbg.write("trace of K*D : %.4e+%.4ei | 2-norm of imag(K) : %.5e\n" % (trace.real,trace.imag,norm))
             return Kmat
        
 class dft_xc():

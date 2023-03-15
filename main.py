@@ -43,7 +43,8 @@ if __name__ == "__main__":
             default=False, action="store_true")
     parser.add_argument("--eri", help="Set type of ERI for tensor contraction, nofit|fit (default: None)", required=False,
             default=None)
-    parser.add_argument("--fitt_HF_exch", help="(If JKClass is employed) fit imaginaty-part HF exchange if the density is complex (for HYBRIDs)",
+    parser.add_argument("--rt_HF_iexch", help="(If JKClass is employed) account for the imaginaty-part of HF exchange if the density\
+              is complex (for HYBRIDs), either using fitted 3-index intergrals of 4-index integrals;  see --eri option",\
                        required=False,default=False, action="store_true")
     parser.add_argument("-m", "--numpy_mem", help="Set the memeory for the PSI4 driver (default 2 Gib)", required=False,
             default=2, type = int)
@@ -77,7 +78,7 @@ if __name__ == "__main__":
 
     # call functions here    
     bset,bsetH, molelecule_str, psi4mol, wfn, jkbase = initialize(args.jkclass,args.scf_type,args.obs1,args.obs2,args.geomA,\
-                   args.func1,args.func2,args.charge,args.numpy_mem,args.eri,args.fitt_HF_exch,args.debug)
+                   args.func1,args.func2,args.charge,args.numpy_mem,args.eri,args.rt_HF_iexch,args.exmodel,args.debug)
 
 
     res, wfnBO = run(jkbase,psi4mol,bset,bsetH,args.guess,args.func1,args.func2,args.exmodel,wfn)
