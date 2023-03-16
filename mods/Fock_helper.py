@@ -295,6 +295,7 @@ class fock_factory():
           self.__Vxc_high = None
           self.__Coul = None
           self.__restricted = True #default
+          self.__vemb = None
           #self.__basis_h = None # the basis of the 'high-level' subsys
           self.__jkfact = jk_fact
     # just a handle
@@ -306,6 +307,8 @@ class fock_factory():
         return self.__S
     def basisobj(self):
         return self.__basis
+    def set_vemb(self,embpot):
+        self.__vemb = embpot
 
     def J(self,Cocc,Dmat=None,sum_str=None,out=None,U=None):
           res = self.__jkfact.J(Cocc,Dmat,sum_str,out)
@@ -480,8 +483,10 @@ class fock_factory():
           J = self.J(Cocc_ao,Dmat_ao)
           # ao/bo subscript omitted when the basis used to express a given quantity 
           # can be inferred from the context
-          
-          H_bo = np.matmul(U.T,np.matmul(self.__Hcore,U))
+          if self.__vemb is not None: 
+             H_bo = np.matmul(U.T,np.matmul(self.__Hcore+self.__vemb,U))
+          else:
+             H_bo = np.matmul(U.T,np.matmul(self.__Hcore,U))
  
           # the two-electron part corresponding to the low-level-theory calculated on D_AA
           VxcAA_low = self.get_xcpot(self.__func,basis_acc,Dmat,Cocc,return_ene=return_ene)

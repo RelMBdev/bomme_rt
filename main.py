@@ -76,6 +76,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # pyemboption goes here
+
     # call functions here    
     bset,bsetH, molelecule_str, psi4mol, wfn, jkbase = initialize(args.jkclass,args.scf_type,args.obs1,args.obs2,args.geomA,\
                    args.func1,args.func2,args.charge,args.numpy_mem,args.eri,args.rt_HF_iexch,args.exmodel,args.debug)

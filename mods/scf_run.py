@@ -174,6 +174,8 @@ def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn):
     #print(np.allclose(E_1el,Ebo_1el))
 
     # Cocc is in BO basis
+    # define a temporaty Cocc_AO
+    # initialize the embedding engine
     print('\nStart SCF iterations:\n\n')
     t = time.time()
 
