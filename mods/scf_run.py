@@ -38,6 +38,105 @@ def build_orbitals(diag,O,nbasis,ndocc):
     D = psi4.core.doublet(Cocc, Cocc, False, True)
     return C, Cocc, D
 
+from dataclasses import dataclass
+
+
+@dataclass
+class bommedata:
+    Cocc: np.ndarray
+    Dtilde : np.ndarray
+    ovapm : np.ndarray
+    Htilde : np.ndarray
+    func_h : str
+    ndocc : int
+    Umat : np.ndarray
+    Bmat : np.ndarray
+    Enuc : np.float64
+    return_ene: bool
+class scf_run():
+    def __init__(self,data_scf,fockengine,bsetH,maxiter,E_conv,D_conv,embobj=None,maxfde=0,fde_thresh=1.0e-6,fde_int=None):
+       self.__fockfact = fockengine
+       self.__data_scf = data_scf
+       self.__bset_acc = bsetH
+       self.__maxit = maxiter
+       self.__maxfde = maxfde
+       self.__fde_thresh = fde_thresh
+       self.__e_conv = E_conv
+       self.__d_conv = D_conv
+       self.__fde_offset = fde_int
+       self.__C = None # collect the final C mat
+       self.__eigvals = None # collect eigs
+       self.__pyemb = embobj
+    def __call__(self): 
+       diis = helper_HF.DIIS_helper(max_vec=6)
+         
+       Eold = 0.
+       func_h = self.__data_scf.func_h
+       B = self.__data_scf.Bmat
+       Cocc = self.__data_scf.Cocc
+       Dtilde = self.__data_scf.Dtilde # can be derived from Cocc (BO basis)
+       U = self.__data_scf.Umat
+       fockengine = self.__fockfact
+       bsetH = self.__bset_acc
+       maxiter = self.__maxit 
+       Stilde = self.__data_scf.ovapm 
+       Htilde = self.__data_scf.Htilde
+       Enuc = self.__data_scf.Enuc
+       E_conv = self.__e_conv
+       D_conv = self.__d_conv
+       ndocc = self.__data_scf.ndocc
+
+       for SCF_ITER in range(1, maxiter + 1):
+       
+           Eh, Exclow, ExcAAlow, ExcAAhigh, Ftilde=fockengine.get_bblock_Fock(Cocc=Cocc,func_acc=func_h,basis_acc=bsetH,U=U,return_ene=True)
+           
+           # DIIS error build and update
+           diis_e = np.matmul(Ftilde, np.matmul(Dtilde, Stilde))
+           diis_e -=np.matmul(Stilde, np.matmul(Dtilde, Ftilde))
+           diis_e = np.matmul(B, np.matmul(diis_e, B))
+       
+           diis.add(psi4.core.Matrix.from_array(Ftilde), psi4.core.Matrix.from_array(diis_e) )
+       
+           # SCF energy and update
+           
+           #SCF_E = Eh + Exc + Enuc + 2.0*np.trace(np.matmul(Dtilde,Htilde))
+           SCF_E = Eh + Exclow + ExcAAhigh -ExcAAlow + Enuc + 2.0*np.trace(np.matmul(Dtilde,Htilde))
+           
+           dRMS = np.sqrt(np.mean(diis_e**2))
+       
+           print('SCF Iteration %3d: Energy = %4.16f   dE = % 1.5E   dRMS = %1.5E'
+                 % (SCF_ITER, SCF_E, (SCF_E - Eold), dRMS))
+           if (abs(SCF_E - Eold) < E_conv) and (dRMS < D_conv):
+               break
+       
+           Eold = SCF_E
+           Dold = Dtilde
+       
+           Ftilde = psi4.core.Matrix.from_array(diis.extrapolate())
+       
+           # Diagonalize Fock matrix
+           #C, Cocc, Dtilde = build_orbitals(dFtilde)
+           
+           ####################################################################################################################
+           # solve the generalized eigenvalue in the block-orthogonalized basis (Stilde)
+           try: 
+                   eigvals,C=scipy.linalg.eigh(Ftilde.np,Stilde,eigvals_only=False)
+           except scipy.linalg.LinAlgError:
+                   print("Error in scipy.linalg.eigh")
+           Cocc=C[:,:ndocc]        
+           Dtilde = psi4.core.doublet(psi4.core.Matrix.from_array(Cocc), psi4.core.Matrix.from_array(Cocc), False, True)
+       
+           if SCF_ITER == maxiter:
+               psi4.clean()
+               raise Exception("Maximum number of SCF cycles exceeded.\n")
+       self.__C = C
+       self.__eigvals = eigvals
+       return Cocc,Dtilde,Ftilde,SCF_E
+    def C(self):
+       return self.__C
+    def epsilon(self):
+       return self.__eigvals
+
 def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,pyembopt=None):
     
     numbas = bset.nbf()
@@ -130,7 +229,7 @@ def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,pyembopt=None)
     # no JK class used 
 
     # Build diis
-    diis = helper_HF.DIIS_helper(max_vec=6)
+    #diis = helper_HF.DIIS_helper(max_vec=6)
 
 
 
@@ -158,7 +257,7 @@ def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,pyembopt=None)
        print("using as guess the density from the low level theory hamiltonian")
        
        Dtilde=np.matmul(u,np.matmul(np.asarray(wfn.Da()),u.T))
-       Dtilde=psi4.core.Matrix.from_array(Dtilde)
+       #Dtilde=psi4.core.Matrix.from_array(Dtilde)
        Cocc=np.matmul(u,np.asarray(wfn.Ca_subset('AO','OCC')))
     else:
        raise Exception("Invalid guess type.\n")
@@ -172,7 +271,7 @@ def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,pyembopt=None)
     E = 0.0
     Enuc = embmol.nuclear_repulsion_energy()
     Eold = 0.0
-    Dold = np.zeros_like(Dtilde)
+    #Dold = np.zeros_like(Dtilde)
 
     #E_1el = np.einsum('pq,pq->', H + H, D) + Enuc
     #Ebo_1el = np.einsum('pq,pq->', Htilde + Htilde, Dtilde) + Enuc
@@ -193,11 +292,27 @@ def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,pyembopt=None)
 
        # set the embedding potential
        fock_help.set_vemb(Vemb)
-    else:  
-       Vemb = None
+
+    # define the common quantities for bomme   
+    data_scf = bommedata
+    
+    data_scf.Cocc   = Cocc
+    data_scf.Dtilde = Dtilde
+    data_scf.ovapm = Stilde
+    data_scf.Htilde = Htilde
+    data_scf.func_h = func_h
+    data_scf.Umat = U
+    data_scf.Bmat = B
+    data_scf.return_ene = True
+    data_scf.Enuc = Enuc
+    data_scf.ndocc = ndocc
+    Bo_scf = scf_run(data_scf,fock_help,bsetH,maxiter,E_conv,D_conv)
     print('\nStart SCF iterations:\n\n')
     t = time.time()
-
+    Cocc,Dtilde,Ftilde,SCF_E = Bo_scf()
+    eigvals = Bo_scf.epsilon()
+    C = Bo_scf.C()
+    """ 
     for SCF_ITER in range(1, maxiter + 1):
 
         Eh, Exclow, ExcAAlow, ExcAAhigh, Ftilde=fock_help.get_bblock_Fock(Cocc=Cocc,func_acc=func_h,basis_acc=bsetH,U=U,return_ene=True)
@@ -241,7 +356,7 @@ def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,pyembopt=None)
         if SCF_ITER == maxiter:
             psi4.clean()
             raise Exception("Maximum number of SCF cycles exceeded.\n")
-
+    """
     print('Total time for SCF iterations: %.3f seconds \n\n' % (time.time() - t))
 
     print('Final scf BO energy: %.8f hartree\n' % SCF_E)
