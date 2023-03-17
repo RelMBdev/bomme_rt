@@ -1,7 +1,7 @@
 import os
 import sys
 import psi4
-
+import numpy as np
 
 sys.path.insert(0, "./common")
 modpaths = os.environ.get('MODS_PATH')
@@ -11,6 +11,7 @@ if modpaths is not None :
         sys.path.append(path)
 from scf_run import run
 from init_run import initialize
+from fde_utils import embedoption
 import argparse
 ####################################################################################
 
@@ -73,17 +74,80 @@ if __name__ == "__main__":
                        default=False, action="store_true")
     parser.add_argument("-f","--input", help="Set input parameters filename [defaul input.inp]", 
                        required=False, default="input.inp", type=str)
-
-    args = parser.parse_args()
+    parser.add_argument("--fde", help="FDE on", required=False,
+            default=False, action="store_true")
 
     # pyemboption goes here
+    parser.add_argument("-gB","--geom_env", help="Specify frozen system (Angstrom) geometry (default: geomB.xyz)", required=False, 
+            type=str, default="geomB.xyz")
+    parser.add_argument("--embthresh", help="set EMB threshold (default = 1.0e-8)", required=False, 
+            type=np.float64, default=1.0e-8)
+    parser.add_argument("--modpaths", help="set berthamod and all other modules path [\"path1;path2;...\"] (default = ../src)", 
+        required=False, type=str, default="../src")
+    parser.add_argument("--env_obs", help="Specify the orbital basis set for the (FDE) enviroment (default: AUG/ADZP)", required=False,
+            type=str, default="AUG/ADZP")
+    parser.add_argument("--env_func", help="Specify the function for the (FDE) environment density (default: BLYP)", required=False,
+            type=str, default="BLYP")
+    parser.add_argument("--grid_opts", help="set gridtype (default: 2)",
+        required=False, type=int, default=2)
+    parser.add_argument("--grid_param", help="set grid parameter i.e grid accuracy in adf (default: '4.0')",
+        required=False, type=str, default="4.0")
+    parser.add_argument("--jobtype", help="set the adf/psi4 embedding job (default = adf)",
+        required=False, type=str, default="adf")
+    parser.add_argument("--gridfname", help="set grid filename (default = grid.dat)",
+        required=False, type=str, default="grid.dat")
+    parser.add_argument("-l", "--linemb", help="Linearized embedding on: the outer loop is skipped", required=False,
+            default=False, action="store_true")
+    parser.add_argument("--nofde", help="embedding off: just for test", required=False, 
+            default=False, action="store_true")
+    parser.add_argument("--static_field", help="Add a static field to the SCF (default : False)", required=False, 
+            default=False, action="store_true")
+    parser.add_argument("--fmax", help="Static field amplitude (default : 1.0e-5)", required=False, 
+            type=np.float64, default=1.0e-5)
+    parser.add_argument("--fdir", help="External field direction (cartesian)  (default: 2)",
+            required=False, type=int, default=2)
+   
+    args = parser.parse_args()
+
+    if args.fde: 
+       pyembopt = embedoption
+       
+       pyembopt.gridfname = args.gridfname
+       
+       pyembopt.debug = args.debug
+       pyembopt.linemb = args.linemb
+       #pyembopt.nofde = args.nofde
+       #pyembopt.verbosity = args.verbosity
+       #pyembopt.thresh = args.thresh
+       pyembopt.static_field = args.static_field
+       pyembopt.fmax = args.fmax
+       pyembopt.fdir = args.fdir
+       pyembopt.activefile = args.geomA
+       pyembopt.envirofile = args.geom_env
+       pyembopt.gtype = args.grid_opts
+       pyembopt.jobtype = args.jobtype
+       pyembopt.thresh_conv = args.embthresh
+       pyembopt.basis = args.env_obs
+       pyembopt.excfuncenv = args.env_func
+       
+       gparam = args.grid_param.split(",")
+       if args.jobtype == 'adf':
+         gparam = [float(m) for m in gparam]
+         if not isinstance(gparam[0],float):
+            raise TypeError("adf grid(param) accuracy must be float")
+         pyembopt.param = gparam[0]
+       else:
+         gparam = [int(m) for m in gparam]
+         pyembopt.param = tuple(gparam)
+    else:
+         pyembopt = None
 
     # call functions here    
     bset,bsetH, molelecule_str, psi4mol, wfn, jkbase = initialize(args.jkclass,args.scf_type,args.obs1,args.obs2,args.geomA,\
                    args.func1,args.func2,args.charge,args.numpy_mem,args.eri,args.rt_HF_iexch,args.exmodel,args.debug)
 
 
-    res, wfnBO = run(jkbase,psi4mol,bset,bsetH,args.guess,args.func1,args.func2,args.exmodel,wfn)
+    res, wfnBO = run(jkbase,psi4mol,bset,bsetH,args.guess,args.func1,args.func2,args.exmodel,wfn,pyembopt)
 
     if args.local_basis and (not args.real_time):
         from rlmo import regional_localize_MO    

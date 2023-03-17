@@ -12,10 +12,16 @@ if modpaths is not None :
     for path in modpaths.split(";"):
         sys.path.append(path)
 
+pyembpaths = os.environ.get('PYBERTHA_MOD_PATH')
+
+if pyembpaths is not None :
+    for path in pyembpaths.split(";"):
+        sys.path.append(path)
 #import bo_helper
 import helper_HF
 #from molecule import Molecule
-
+import fde_utils
+from pyembmod import GridDensityFactory
 # Diagonalize routine
 def build_orbitals(diag,O,nbasis,ndocc):
     Fp = psi4.core.triplet(O, diag, O, True, False, True)
@@ -32,7 +38,7 @@ def build_orbitals(diag,O,nbasis,ndocc):
     D = psi4.core.doublet(Cocc, Cocc, False, True)
     return C, Cocc, D
 
-def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn):
+def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,pyembopt=None):
     
     numbas = bset.nbf()
     nbfA = bsetH.nbf()
@@ -174,8 +180,21 @@ def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn):
     #print(np.allclose(E_1el,Ebo_1el))
 
     # Cocc is in BO basis
+    if pyembopt is not None:
     # define a temporaty Cocc_AO
+       Cocc_AO = np.matmul(U,Cocc)
     # initialize the embedding engine
+       embed = fde_utils.emb_wrapper(embmol,pyembopt,bset)
+       # here we need the active system density expressed on the grid
+       rho = embed.set_density(Cocc_AO)
+       nel_ACT =embed.rho_integral()
+       print("N.el active system : %.8f\n" % nel_ACT)
+       Vemb = embed.make_embpot(rho)
+
+       # set the embedding potential
+       fock_help.set_vemb(Vemb)
+    else:  
+       Vemb = None
     print('\nStart SCF iterations:\n\n')
     t = time.time()
 
