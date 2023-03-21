@@ -54,19 +54,21 @@ class bommedata:
     Enuc : np.float64
     return_ene: bool
 class scf_run():
-    def __init__(self,data_scf,fockengine,bsetH,maxiter,E_conv,D_conv,embobj=None,maxfde=0,fde_thresh=1.0e-6,fde_int=None):
+    def __init__(self,data_scf,fockengine,bsetH,maxiter,E_conv,D_conv,embobj=None,opt=None):
        self.__fockfact = fockengine
        self.__data_scf = data_scf
        self.__bset_acc = bsetH
        self.__maxit = maxiter
-       self.__maxfde = maxfde
-       self.__fde_thresh = fde_thresh
-       self.__e_conv = E_conv
+       self.__maxfde = None
+       self.__fde_thresh = None
+       self.__e_conv = E_conv 
        self.__d_conv = D_conv
-       self.__fde_offset = fde_int
        self.__C = None # collect the final C mat
        self.__eigvals = None # collect eigs
        self.__pyemb = embobj
+       if opt is not None:
+         self.__maxfde = opt.maxit_fde
+         self.__fde_thresh = opt.fde_thresh
     def __call__(self): 
        diis = helper_HF.DIIS_helper(max_vec=6)
          
@@ -86,49 +88,74 @@ class scf_run():
        D_conv = self.__d_conv
        ndocc = self.__data_scf.ndocc
 
-       for SCF_ITER in range(1, maxiter + 1):
-       
-           Eh, Exclow, ExcAAlow, ExcAAhigh, Ftilde=fockengine.get_bblock_Fock(Cocc=Cocc,func_acc=func_h,basis_acc=bsetH,U=U,return_ene=True)
+       for fde_iter in range(self.__maxfde+1): #maxfde specify the number of emb-potential updates
+           Dmat_ext = np.matmul(Cocc,Cocc.T)
+           for SCF_ITER in range(1, maxiter + 1):
+
+               Eh, Exclow, ExcAAlow, ExcAAhigh, Ftilde=fockengine.get_bblock_Fock(Cocc=Cocc,func_acc=func_h,basis_acc=bsetH,U=U,return_ene=True)
+               
+               # DIIS error build and update
+               diis_e = np.matmul(Ftilde, np.matmul(Dtilde, Stilde))
+               diis_e -=np.matmul(Stilde, np.matmul(Dtilde, Ftilde))
+               diis_e = np.matmul(B, np.matmul(diis_e, B))
            
-           # DIIS error build and update
-           diis_e = np.matmul(Ftilde, np.matmul(Dtilde, Stilde))
-           diis_e -=np.matmul(Stilde, np.matmul(Dtilde, Ftilde))
-           diis_e = np.matmul(B, np.matmul(diis_e, B))
-       
-           diis.add(psi4.core.Matrix.from_array(Ftilde), psi4.core.Matrix.from_array(diis_e) )
-       
-           # SCF energy and update
+               diis.add(psi4.core.Matrix.from_array(Ftilde), psi4.core.Matrix.from_array(diis_e) )
            
-           #SCF_E = Eh + Exc + Enuc + 2.0*np.trace(np.matmul(Dtilde,Htilde))
-           SCF_E = Eh + Exclow + ExcAAhigh -ExcAAlow + Enuc + 2.0*np.trace(np.matmul(Dtilde,Htilde))
+               # SCF energy and update
+               
+               #SCF_E = Eh + Exc + Enuc + 2.0*np.trace(np.matmul(Dtilde,Htilde))
+               SCF_E = Eh + Exclow + ExcAAhigh -ExcAAlow + Enuc + 2.0*np.trace(np.matmul(Dtilde,Htilde))
+               
+               dRMS = np.sqrt(np.mean(diis_e**2))
            
-           dRMS = np.sqrt(np.mean(diis_e**2))
-       
-           print('SCF Iteration %3d: Energy = %4.16f   dE = % 1.5E   dRMS = %1.5E'
-                 % (SCF_ITER, SCF_E, (SCF_E - Eold), dRMS))
-           if (abs(SCF_E - Eold) < E_conv) and (dRMS < D_conv):
-               break
-       
-           Eold = SCF_E
-           Dold = Dtilde
-       
-           Ftilde = psi4.core.Matrix.from_array(diis.extrapolate())
-       
-           # Diagonalize Fock matrix
-           #C, Cocc, Dtilde = build_orbitals(dFtilde)
+               print('SCF Iteration %3d: Energy = %4.16f   dE = % 1.5E   dRMS = %1.5E'
+                     % (SCF_ITER, SCF_E, (SCF_E - Eold), dRMS))
+               if (abs(SCF_E - Eold) < E_conv) and (dRMS < D_conv):
+                   break
            
-           ####################################################################################################################
-           # solve the generalized eigenvalue in the block-orthogonalized basis (Stilde)
-           try: 
-                   eigvals,C=scipy.linalg.eigh(Ftilde.np,Stilde,eigvals_only=False)
-           except scipy.linalg.LinAlgError:
-                   print("Error in scipy.linalg.eigh")
-           Cocc=C[:,:ndocc]        
-           Dtilde = psi4.core.doublet(psi4.core.Matrix.from_array(Cocc), psi4.core.Matrix.from_array(Cocc), False, True)
-       
-           if SCF_ITER == maxiter:
-               psi4.clean()
-               raise Exception("Maximum number of SCF cycles exceeded.\n")
+               Eold = SCF_E
+               Dold = Dtilde
+           
+               Ftilde = psi4.core.Matrix.from_array(diis.extrapolate())
+           
+               # Diagonalize Fock matrix
+               #C, Cocc, Dtilde = build_orbitals(dFtilde)
+               
+               ####################################################################################################################
+               # solve the generalized eigenvalue in the block-orthogonalized basis (Stilde)
+               try: 
+                       eigvals,C=scipy.linalg.eigh(Ftilde.np,Stilde,eigvals_only=False)
+               except scipy.linalg.LinAlgError:
+                       print("Error in scipy.linalg.eigh")
+               Cocc=C[:,:ndocc]        
+               Dtilde = psi4.core.doublet(psi4.core.Matrix.from_array(Cocc), psi4.core.Matrix.from_array(Cocc), False, True)
+           
+               if SCF_ITER == maxiter:
+                   psi4.clean()
+                   raise Exception("Maximum number of SCF cycles exceeded.\n")
+               # end scf inner loop
+           #update the embedding potential if maxfde >0
+           if self.__maxfde > 0:
+              vemb_in = fockengine.current_vemb()
+              # set the Cocc [from SCF loop] 
+              Cocc_tmp = np.matmul(U,Cocc)
+
+              rho = self.__pyemb.set_density(Cocc_tmp)
+              Vemb = self.__pyemb.make_embpot(rho)
+              Dmat_out = np.asarray(Dtilde) 
+              diff_emb = vemb_in - Vemb
+              diff_D = Dmat_out - Dmat_ext
+              diff_D = np.matmul(U,np.matmul(diff_D,U.T))
+              norm_D=np.linalg.norm(diff_D,'fro')
+              norm_v=np.linalg.norm(diff_emb,'fro')
+              if (norm_D <  self.__fde_thresh) and (norm_v <self.__fde_thresh):
+                 print("norm_D : %.12f\n" % norm_D)
+                 print("norm_v : %.12f\n" % norm_v)
+                 break
+              else:
+                 #set the updated embedding potential and do an additional iteration
+                 fockengine.set_vemb(Vemb)
+                 print("upgrading Vemb\n")
        self.__C = C
        self.__eigvals = eigvals
        return Cocc,Dtilde,Ftilde,SCF_E
@@ -292,6 +319,8 @@ def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,pyembopt=None)
 
        # set the embedding potential
        fock_help.set_vemb(Vemb)
+    else:
+       embed = None
 
     # define the common quantities for bomme   
     data_scf = bommedata
@@ -306,7 +335,8 @@ def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,pyembopt=None)
     data_scf.return_ene = True
     data_scf.Enuc = Enuc
     data_scf.ndocc = ndocc
-    Bo_scf = scf_run(data_scf,fock_help,bsetH,maxiter,E_conv,D_conv)
+    
+    Bo_scf = scf_run(data_scf,fock_help,bsetH,maxiter,E_conv,D_conv,embobj=embed,opt=pyembopt)
     print('\nStart SCF iterations:\n\n')
     t = time.time()
     Cocc,Dtilde,Ftilde,SCF_E = Bo_scf()

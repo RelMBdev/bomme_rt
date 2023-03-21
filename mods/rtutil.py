@@ -211,7 +211,7 @@ funcswitcher = {
 ##################################################################
 
 def mo_fock_mid_forwd_eval(Dp_ti,fock_mid_ti_backwd,i,delta_t,fock_base,dipole,\
-                        C,S,imp_opts,U,func_h,bsetH,exA=False,maxiter= 10 ,Vemb=None,fout=sys.stderr, debug=False):
+                        C,S,imp_opts,U,func_h,bsetH,exA=False,maxiter= 10 ,fout=sys.stderr, debug=False):
 
     t_arg=np.float_(i)*np.float_(delta_t)
     
@@ -227,8 +227,6 @@ def mo_fock_mid_forwd_eval(Dp_ti,fock_mid_ti_backwd,i,delta_t,fock_base,dipole,\
     k=1
     
     Eh_i,Exclow_i,ExcAAlow_i,ExcAAhigh_i,fock_mtx = fock_base.get_fock(Dmat=D_ti,func_acc=func_h,basis_acc=bsetH,U=U,return_ene=True)
-    if isinstance(Vemb,np.ndarray):
-        fock_mtx += Vemb
     #DEBUG
     #ExcAAhigh_i=0.0
     #ExcAAlow_i=0.0
@@ -274,8 +272,7 @@ def mo_fock_mid_forwd_eval(Dp_ti,fock_mid_ti_backwd,i,delta_t,fock_base,dipole,\
         #DEBUG
         #dum1,dum2,fock_mtx=get_Fock(D_ti_dt,H,I,func_l,basisset)
         dum0,dum1,dum2,dum3,fock_mtx = fock_base.get_fock(Dmat=D_ti_dt,func_acc=func_h,basis_acc=bsetH,U=U,return_ene=True)
-        if isinstance(Vemb,np.ndarray):
-            fock_mtx += Vemb
+        
         #print('fockmtx s in loop max diff: %.12e\n' % np.max(tfock_mtx-fock_mtx))
         #update t_arg+=delta_t
         pulse_dt = func(imp_opts['Fmax'], imp_opts['w'], t_arg+delta_t,\

@@ -82,6 +82,8 @@ if __name__ == "__main__":
             type=str, default="geomB.xyz")
     parser.add_argument("--embthresh", help="set EMB threshold (default = 1.0e-8)", required=False, 
             type=np.float64, default=1.0e-8)
+    parser.add_argument("--fde_max", help="Max number of fde iteration for splitSCF scheme  (default: 0)",
+            required=False, type=int, default=0)
     parser.add_argument("--modpaths", help="set berthamod and all other modules path [\"path1;path2;...\"] (default = ../src)", 
         required=False, type=str, default="../src")
     parser.add_argument("--env_obs", help="Specify the orbital basis set for the (FDE) enviroment (default: AUG/ADZP)", required=False,
@@ -96,16 +98,16 @@ if __name__ == "__main__":
         required=False, type=str, default="adf")
     parser.add_argument("--gridfname", help="set grid filename (default = grid.dat)",
         required=False, type=str, default="grid.dat")
-    parser.add_argument("-l", "--linemb", help="Linearized embedding on: the outer loop is skipped", required=False,
-            default=False, action="store_true")
-    parser.add_argument("--nofde", help="embedding off: just for test", required=False, 
-            default=False, action="store_true")
     parser.add_argument("--static_field", help="Add a static field to the SCF (default : False)", required=False, 
             default=False, action="store_true")
     parser.add_argument("--fmax", help="Static field amplitude (default : 1.0e-5)", required=False, 
             type=np.float64, default=1.0e-5)
     parser.add_argument("--fdir", help="External field direction (cartesian)  (default: 2)",
             required=False, type=int, default=2)
+    parser.add_argument("-u","--update_offset", help="Embedding potential update offset (potential is static in the prescribed time interval)",
+            default=0.1, type = float)
+    parser.add_argument("-i","--iterative", help="Set iterative update of the embedding potential", required=False,
+            default=False, action="store_true")
    
     args = parser.parse_args()
 
@@ -115,10 +117,11 @@ if __name__ == "__main__":
        pyembopt.gridfname = args.gridfname
        
        pyembopt.debug = args.debug
-       pyembopt.linemb = args.linemb
-       #pyembopt.nofde = args.nofde
        #pyembopt.verbosity = args.verbosity
-       #pyembopt.thresh = args.thresh
+       pyembopt.fde_thresh = args.embthresh
+       pyembopt.maxit_fde = args.fde_max
+       pyembopt.fde_offset = args.update_offset
+       pyembopt.iterative = args.iterative
        pyembopt.static_field = args.static_field
        pyembopt.fmax = args.fmax
        pyembopt.fdir = args.fdir
@@ -167,5 +170,5 @@ if __name__ == "__main__":
        print("Startig real-time tddft computation")
        print()
        # call rt using the four indices I tensor (for small systems due to memory requirements)
-       rt_mod_new.run_rt_iterations(fnameinput, bset, bsetH, wfnBO, psi4mol, args.axis, args.select, args.selective_pert, args.local_basis, args.exciteA_only, args.numpy_mem, args.debug)
+       rt_mod_new.run_rt_iterations(fnameinput, bset, bsetH, wfnBO, psi4mol, args.axis, args.select, args.selective_pert, args.local_basis, args.exciteA_only, args.numpy_mem, args.debug,pyembopt)
          

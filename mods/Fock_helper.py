@@ -309,6 +309,8 @@ class fock_factory():
         return self.__basis
     def set_vemb(self,embpot):
         self.__vemb = embpot
+    def current_vemb(self):
+        return self.__vemb
 
     def J(self,Cocc,Dmat=None,sum_str=None,out=None,U=None):
           res = self.__jkfact.J(Cocc,Dmat,sum_str,out)
@@ -436,9 +438,13 @@ class fock_factory():
              # if return_ene=True in get_xcpot() a tuple will be returned
              res = self.__Hcore +2.0*J +Vxc[0]
              Jene = 2.00*np.trace( np.matmul(J,Dmat) )
+             if isinstance(self.__vemb,np.ndarray):
+                 res += self.__vemb
              return Jene, Vxc[1],res
           else:
              res = self.__Hcore +2.0*J +Vxc
+             if isinstance(self.__vemb,np.ndarray):
+                 res += self.__vemb
              return res
     
     # a cleaner implementation of the block-orthogonalized Fock

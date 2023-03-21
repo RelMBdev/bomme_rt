@@ -26,14 +26,15 @@ if modpaths is not None :
 import bo_helper
 from localizer import Localizer 
 import rtutil
+import fde_utils
 ##################################################################
 
 # mo_select : string containing two substrings "-2; list_occ & list_vist"
 # selective_pert : bool.  Turn on selective perturbation. See Repisky M et al 2015
 # local_basis : bool . Use a localized basis instead of ground-state MOs
 # exA_only : excite only A subsystem; either using local_bas or selective_pert or numerical approach
-def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_select, selective_pert, local_basis, exA_only, numpy_mem,debug):
-
+def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_select, selective_pert, local_basis, exA_only, numpy_mem,debug,pyembopt=None):
+    # TODO: the parameter of the propagation (e.g delta_t, n_iter are derivede locally) can be passed from outside
     numbas = wfn_bo['nbf_tot']
     nbf_A = wfn_bo['nbf_A']
     #ndocc refers to the total number of doubly occupied MO
@@ -103,6 +104,22 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
 
     fock_base = fock_factory(jkclass,Hcore,Stilde, \
                             funcname=func_l,basisobj=bset,exmodel=exmodel)
+    if pyembopt is not None:
+    # define a temporaty Cocc_AO
+       Cocc_tmp = np.matmul(U,C[:,:ndocc])
+       
+    # initialize the embedding engine
+       embed = fde_utils.emb_wrapper(embmol,pyembopt,bset,ovap=np.array(mints.ao_overlap()))
+       # here we need the active system density expressed on the grid
+       rho = embed.set_density(Cocc_tmp)
+       nel_ACT =embed.rho_integral()
+       print("N.el active system : %.8f\n" % nel_ACT)
+       Vemb = embed.make_embpot(rho)
+
+       # set the embedding potential
+       fock_base.set_vemb(Vemb)
+    else:
+       embed = None
     
     #dip_mat is transformed in the BO basis
     dipole=mints.ao_dipole()
@@ -132,7 +149,10 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
     rt_prop = real_time(Dtilde, Ftilde, fock_base, ndocc, bset, Stilde, field_opts, dt, C, dipmat_list,\
                            out_file=outfile,  basis_acc = bsetH, func_acc=func_h,U=U,local_basis=local_basis,\
                                              exA_only=exA_only,occlist=occlist, virtlist=virtlist)
-    
+     
+    if pyembopt is not None:
+          rt_prop.embedding_init(embed,pyembopt)
+
     print("testing initial density matrix\n")
     try :
       C_inv=np.linalg.inv(C)

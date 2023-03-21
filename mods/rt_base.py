@@ -39,7 +39,8 @@ class real_time():
       self.__D = Dinit
       self.__outfile = out_file
       self.__step_count = 0
-      self.__vemb = None
+      self.__embfactory = None
+      self.__embopt = None
       self.__ene_list = []
       self.__dip_list = []
       self.__dperp0_list = [] # the expectation values  of perpendicular components (wrt the boost) of dipole
@@ -156,8 +157,9 @@ class real_time():
 
        return Dp_0, D_init
 
-    def set_vemb(self,embpot):
-      self.__vemb = embpot
+    def embedding_init(self,embpot,pyembopt):
+      self.__embfactory = embpot
+      self.__embopt = pyembopt
 
     def __call__(self):
         i_step = self.__step_count
@@ -172,14 +174,27 @@ class real_time():
         bsetH = self.__basisobj_acc
         func_h = self.__func_acc
         exA_only = self.__exA_only
+        pyembopt = self.__embopt
+        embfactory = self.__embfactory
 
         ###
         #def mo_fock_mid_forwd_eval(Dp_ti,fock_mid_ti_backwd,i,delta_t,fock_base,dipole,\
         #                        C,S,imp_opts,U,func_h,bsetH,exA=False,maxit= 10 ,Vemb=None,fout=sys.stderr, debug=False)
         ##
-
+        #if iterative embedding is required  feed fock_base with embedding potential here
+        if pyembopt.iterative:
+           if ( ( i_step % int(pyembopt.fde_offset/dt) ) == 0.0 ):
+               # make new emb potential
+               # transform from the progation basis to the atomic basis (either BO or AO)
+               # further transform to the AO basis if Umat is not None
+               D_emb = np.matmul(C,np.matmul(self.__Dp,C.T))
+               if U is not None:
+                   D_emb = np.matmul(U,np.matmul(D_emb,U.T))
+               rho = embfactory.set_density(None,D_emb) # set density through the density matrix
+               Vemb = embfactory.make_embpot(rho)
+               fock_base.set_vemb(Vemb)
         Eh,Exclow,ExcAAhigh,ExcAAlow,func_t,F_ti,fock_mid, Dp_ti_dt = rtutil.mo_fock_mid_forwd_eval(self.__Dp,self.__Fock_mid,\
-                            i_step,np.float_(dt), fock_base, dip_mat, C, ovapm, pulse_opts, U, func_h, bsetH, exA_only,fout=fo,debug=False, Vemb=self.__vemb)
+                            i_step,np.float_(dt), fock_base, dip_mat, C, ovapm, pulse_opts, U, func_h, bsetH, exA_only,fout=fo,debug=False)
         self.__field_t = func_t
         # expressed in AO basis
         Hcore = fock_base.H()

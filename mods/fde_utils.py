@@ -26,13 +26,15 @@ class embedoption:
     envirofile :str 
     #dumpfiles: bool
     debug: bool
-    linemb: bool
-    thresh: np.float64
-    thresh_conv: np.float64 = 1.0e-8
+    thresh: float
+    iterative : bool
+    fde_offset: np.float64
+    fde_thresh: np.float64 = 1.0e-6
+    maxit_fde : int = 0
     inputfile: str = "input.inp"
     gtype: int = 2
     jobtype : str = 'adf'
-    nofde: bool = False
+    nofde: bool = False # remove
     param: tuple = (4.0,)   # these are grid parameters, i.e grid accuracy in adf / radial and angular point number in psi4
     basis: str = 'AUG/ADZP'
     excfuncenv : str = "BLYP"
@@ -203,10 +205,6 @@ if __name__ == "__main__":
         required=False, type=str, default="adf")
     parser.add_argument("--gridfname", help="set grid filename (default = grid.dat)",
         required=False, type=str, default="grid.dat")
-    parser.add_argument("-l", "--linemb", help="Linearized embedding on: the outer loop is skipped", required=False,
-            default=False, action="store_true")
-    parser.add_argument("--nofde", help="embedding off: just for test", required=False, 
-            default=False, action="store_true")
     parser.add_argument("--static_field", help="Add a static field to the SCF (default : False)", required=False, 
             default=False, action="store_true")
     parser.add_argument("--fmax", help="Static field amplitude (default : 1.0e-5)", required=False, 
@@ -233,8 +231,6 @@ if __name__ == "__main__":
     pyembopt.gridfname = args.gridfname
 
     pyembopt.debug = args.debug
-    pyembopt.linemb = args.linemb
-    pyembopt.nofde = args.nofde
     #pyembopt.thresh = args.thresh
     pyembopt.static_field = args.static_field
     pyembopt.fmax = args.fmax
