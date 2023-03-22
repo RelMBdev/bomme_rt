@@ -40,9 +40,13 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
     # dump tmp file
     with open("tmp.xyz","w") as fgeom_act:
         fgeom_act.write("%s\n" %  str(natom1) )
-        fgeom_act.write('\n') # black line        
-        for line in geomstr:
-         fgeom_act.write(line)
+        fgeom_act.write('\n') # black line       
+        tmp = (geomstr.split('\n'))[:natom1]
+        for line in tmp:
+         
+         unlabeled = line.split()[0].replace('1','') + '   ' + line.split()[1] + '   ' + line.split()[2] + '   ' + line.split()[3]+ '\n'
+         fgeom_act.write(unlabeled)
+         
     moltot = Molecule()
     moltot.set_charge(charge)
     moltot.geom_from_string(geomstr)
