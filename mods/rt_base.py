@@ -176,13 +176,15 @@ class real_time():
         exA_only = self.__exA_only
         pyembopt = self.__embopt
         embfactory = self.__embfactory
-
+        iterative = False # set iterative : False by default
+        if pyembopt is not None: 
+            iterative = pyembopt.iterative
         ###
         #def mo_fock_mid_forwd_eval(Dp_ti,fock_mid_ti_backwd,i,delta_t,fock_base,dipole,\
         #                        C,S,imp_opts,U,func_h,bsetH,exA=False,maxit= 10 ,Vemb=None,fout=sys.stderr, debug=False)
         ##
         #if iterative embedding is required  feed fock_base with embedding potential here
-        if pyembopt.iterative:
+        if iterative:
            if ( ( i_step % int(pyembopt.fde_offset/dt) ) == 0.0 ):
                # make new emb potential
                # transform from the progation basis to the atomic basis (either BO or AO)

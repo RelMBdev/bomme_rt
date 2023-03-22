@@ -59,7 +59,7 @@ class scf_run():
        self.__data_scf = data_scf
        self.__bset_acc = bsetH
        self.__maxit = maxiter
-       self.__maxfde = None
+       self.__maxfde = 0
        self.__fde_thresh = None
        self.__e_conv = E_conv 
        self.__d_conv = D_conv
