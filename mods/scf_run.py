@@ -149,11 +149,11 @@ class scf_run():
               norm_D=np.linalg.norm(diff_D,'fro')
               norm_v=np.linalg.norm(diff_emb,'fro')
               if (norm_D <  self.__fde_thresh) and (norm_v <self.__fde_thresh):
-                 print("norm_D : %.12f\n" % norm_D)
-                 print("norm_v : %.12f\n" % norm_v)
                  break
               else:
                  #set the updated embedding potential and do an additional iteration
+                 print("norm_D : %.12f\n" % norm_D)
+                 print("norm_v : %.12f\n" % norm_v)
                  fockengine.set_vemb(Vemb)
                  print("upgrading Vemb\n")
        self.__C = C
@@ -306,7 +306,7 @@ def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,pyembopt=None)
     #print(np.allclose(E_1el,Ebo_1el))
 
     # Cocc is in BO basis
-    if pyembopt is not None:
+    if not pyembopt.nofde or pyembopt.static_field:
     # define a temporaty Cocc_AO
        Cocc_AO = np.matmul(U,Cocc)
     # initialize the embedding engine

@@ -88,6 +88,7 @@ class emb_wrapper():
        self.__mol_obj = mol_obj
        self.__basis_act = basis_act
        self.__grid = None
+       self.__initpot = None
        self.__debug = pyembopt.debug
        self.__env_obs = pyembopt.basis
        self.__tot_charge = pyembopt.tot_charge
@@ -145,34 +146,39 @@ class emb_wrapper():
                 raise TypeError("C mat must be np.ndarray")
 
             rho = activesys.from_Cocc(Cocc)
-        self.__rho = rho
-        return rho
+        self.__rho = 2.00*rho
+        return 2.00*rho
 
     def rho_integral(self):
         if not isinstance(self.__grid,np.ndarray):
            raise TypeError("Not a grid array")
         w = self.__grid[:,3]
-        sum_rho =np.matmul(self.__rho,w)*2.00
+        sum_rho =np.matmul(self.__rho,w)
         return sum_rho
 
-    def make_embpot(self,rho_on_grid):      
-        
-        density=np.zeros((rho_on_grid.shape[0],10))
-        density[:,0] = rho_on_grid
-        pot = self.__embfactory.get_potential(density) 
-        
+    def make_embpot(self,rho_on_grid):  # assume this is the real density, i.e it sums to the "real" n. of electrons    
+        if not self.__nofde:
+           density=np.zeros((rho_on_grid.shape[0],10))
+           density[:,0] = rho_on_grid
+           pot = self.__embfactory.get_potential(density) 
+        else:
+           pot = np.zeros_like(rho_on_grid) 
+
         if self.__e_field:
-          fpot = self.__grid[:,fdir]*self.__fmax 
+          fpot = self.__grid[:,self.__fdir]*self.__fmax 
           fpot = np.ascontiguousarray(fpot, dtype=np.double)
-          totpot = pot+fpot
-          if nofde:
-             totpot = fpot
+          totpot = fpot
+          if not self.__nofde:
+             totpot = fpot +pot
           totpot = np.ascontiguousarray(totpot, dtype=np.double)
         else:
            totpot = pot 
+        if self.__initpot is None:
+            self.__initpot = totpot
         if (self.__debug):
-            np.savetxt ("initialpot.txt", totpot)
-        
+            np.savetxt ("initialpot.txt", self.__initpot)
+        if not isinstance(totpot,np.ndarray):
+           raise Exception("not a grid function")
         gridfunc = GridFuncFactory(self.__mol_obj,self.__grid,self.__basis_act)  
         vemb = gridfunc.matrix_from_grid(totpot)
          

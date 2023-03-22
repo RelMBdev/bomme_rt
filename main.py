@@ -113,41 +113,40 @@ if __name__ == "__main__":
    
     args = parser.parse_args()
 
-    if args.fde: 
-       pyembopt = embedoption
-       
-       pyembopt.gridfname = args.gridfname
-       
-       pyembopt.debug = args.debug
-       #pyembopt.verbosity = args.verbosity
-       pyembopt.fde_thresh = args.embthresh
-       pyembopt.tot_charge = args.charge_tot
-       pyembopt.core_charge = args.charge
-       pyembopt.maxit_fde = args.fde_max
-       pyembopt.fde_offset = args.update_offset
-       pyembopt.iterative = args.iterative
-       pyembopt.static_field = args.static_field
-       pyembopt.fmax = args.fmax
-       pyembopt.fdir = args.fdir
-       pyembopt.activefile = "tmp.xyz"
-       pyembopt.envirofile = args.geom_env
-       pyembopt.gtype = args.grid_opts
-       pyembopt.jobtype = args.jobtype
-       pyembopt.thresh_conv = args.embthresh
-       pyembopt.basis = args.env_obs
-       pyembopt.excfuncenv = args.env_func
-       
-       gparam = args.grid_param.split(",")
-       if args.jobtype == 'adf':
-         gparam = [float(m) for m in gparam]
-         if not isinstance(gparam[0],float):
-            raise TypeError("adf grid(param) accuracy must be float")
-         pyembopt.param = gparam[0]
-       else:
-         gparam = [int(m) for m in gparam]
-         pyembopt.param = tuple(gparam)
+    
+    pyembopt = embedoption
+    
+    pyembopt.gridfname = args.gridfname
+    
+    pyembopt.debug = args.debug
+    pyembopt.nofde = (not args.fde)
+    #pyembopt.verbosity = args.verbosity
+    pyembopt.fde_thresh = args.embthresh
+    pyembopt.tot_charge = args.charge_tot
+    pyembopt.core_charge = args.charge
+    pyembopt.maxit_fde = args.fde_max
+    pyembopt.fde_offset = args.update_offset
+    pyembopt.iterative = args.iterative
+    pyembopt.static_field = args.static_field
+    pyembopt.fmax = args.fmax
+    pyembopt.fdir = args.fdir
+    pyembopt.activefile = "tmp.xyz"
+    pyembopt.envirofile = args.geom_env
+    pyembopt.gtype = args.grid_opts
+    pyembopt.jobtype = args.jobtype
+    pyembopt.thresh_conv = args.embthresh
+    pyembopt.basis = args.env_obs
+    pyembopt.excfuncenv = args.env_func
+    
+    gparam = args.grid_param.split(",")
+    if args.jobtype == 'adf':
+      gparam = [float(m) for m in gparam]
+      if not isinstance(gparam[0],float):
+         raise TypeError("adf grid(param) accuracy must be float")
+      pyembopt.param = gparam[0]
     else:
-         pyembopt = None
+      gparam = [int(m) for m in gparam]
+      pyembopt.param = tuple(gparam)
 
     # call functions here    
     bset,bsetH, molelecule_str, psi4mol, wfn, jkbase = initialize(args.jkclass,args.scf_type,args.obs1,args.obs2,args.geomA,\
