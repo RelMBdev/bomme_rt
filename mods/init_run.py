@@ -127,7 +127,7 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
     #nelA=wfnA.nalpha()+wfnA.nbeta()
     #print("Frag. A el: %i" %nelA)
     #print()
-    print("centers of high level subsys: %i" % molA.natom())
+    print("centers of high level subsys: %i" % mHigh.natom())
 
 
     bset=wfn.basisset()
