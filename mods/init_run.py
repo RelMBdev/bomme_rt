@@ -37,6 +37,12 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
     # corestr is a string containing only the 'high-level-theory' subsys
     speclist, geomstr, corestr, natom1 = gparser(fgeom)
     
+    # dump tmp file
+    with open("tmp.xyz","w") as fgeom_act:
+        fgeom_act.write("%s\n" %  str(natom1) )
+        fgeom_act.write('\n') # black line        
+        for line in geomstr:
+         fgeom_act.write(line)
     moltot = Molecule()
     moltot.set_charge(charge)
     moltot.geom_from_string(geomstr)
@@ -56,7 +62,7 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
     # used in fragment A basis definition, see below
     molA = Molecule()
     molA.geom_from_string(corestr,natom1)
-
+    
     #molA.display_xyz()
     #molB.display_xyz()
 

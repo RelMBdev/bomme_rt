@@ -50,7 +50,7 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--numpy_mem", help="Set the memeory for the PSI4 driver (default 2 Gib)", required=False,
             default=2, type = int)
 
-    parser.add_argument("-z", "--charge", help="Charge of the whole system",
+    parser.add_argument("-z", "--charge", help="Charge of the bomme subsystem",
             default=0, type = int)
     parser.add_argument("-x", "--exmodel", help="Set the exchange model (EX-0 or EX-1) between subsystems (default EX: 0)",
             default=0, type = int)
@@ -80,6 +80,8 @@ if __name__ == "__main__":
     # pyemboption goes here
     parser.add_argument("-gB","--geom_env", help="Specify frozen system (Angstrom) geometry (default: geomB.xyz)", required=False, 
             type=str, default="geomB.xyz")
+    parser.add_argument("-Z", "--charge_tot", help="Charge of the FDE system [bomme(A)+ env(B)]",
+            default=0, type = int)
     parser.add_argument("--embthresh", help="set EMB threshold (default = 1.0e-8)", required=False, 
             type=np.float64, default=1.0e-8)
     parser.add_argument("--fde_max", help="Max number of fde iteration for splitSCF scheme  (default: 0)",
@@ -119,13 +121,15 @@ if __name__ == "__main__":
        pyembopt.debug = args.debug
        #pyembopt.verbosity = args.verbosity
        pyembopt.fde_thresh = args.embthresh
+       pyembopt.tot_charge = args.charge_tot
+       pyembopt.core_charge = args.charge
        pyembopt.maxit_fde = args.fde_max
        pyembopt.fde_offset = args.update_offset
        pyembopt.iterative = args.iterative
        pyembopt.static_field = args.static_field
        pyembopt.fmax = args.fmax
        pyembopt.fdir = args.fdir
-       pyembopt.activefile = args.geomA
+       pyembopt.activefile = "tmp.xyz"
        pyembopt.envirofile = args.geom_env
        pyembopt.gtype = args.grid_opts
        pyembopt.jobtype = args.jobtype

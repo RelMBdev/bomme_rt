@@ -28,6 +28,8 @@ class embedoption:
     debug: bool
     thresh: float
     iterative : bool
+    tot_charge : int
+    core_charge : int  # the core system is the bomme subsystem
     fde_offset: np.float64
     fde_thresh: np.float64 = 1.0e-6
     maxit_fde : int = 0
@@ -88,6 +90,8 @@ class emb_wrapper():
        self.__grid = None
        self.__debug = pyembopt.debug
        self.__env_obs = pyembopt.basis
+       self.__tot_charge = pyembopt.tot_charge
+       self.__active_charge = pyembopt.core_charge
        
        activefname = pyembopt.activefile
        if not os.path.isfile(activefname):
@@ -100,6 +104,9 @@ class emb_wrapper():
        self.__embfactory = pyembmod.pyemb(activefname,envirofname,pyembopt.jobtype) #jobtype='adf' is default
        #grid_param =[50,110] # psi4 grid parameters (see Psi4 grid table), can be set using args.grid_param
        
+       self.__embfactory.set_charge(self.__active_charge) 
+       self.__embfactory.set_charge(self.__tot_charge,'total') 
+
        self.__embfactory.set_options(param=pyembopt.param, \
           gtype=pyembopt.gtype, basis=pyembopt.basis) 
        self.__embfactory.set_enviro_func(pyembopt.excfuncenv) 
