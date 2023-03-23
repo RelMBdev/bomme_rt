@@ -93,6 +93,7 @@ class emb_wrapper():
        self.__env_obs = pyembopt.basis
        self.__tot_charge = pyembopt.tot_charge
        self.__active_charge = pyembopt.core_charge
+       self.__rho = None
        
        activefname = pyembopt.activefile
        if not os.path.isfile(activefname):
@@ -133,7 +134,7 @@ class emb_wrapper():
     def grid(self):
         return self.__grid
 
-    def set_density(self,Cocc,Dmat=None):
+    def set_density(self,Cocc,Dmat=None,return_rho=False):
         
         activesys = GridDensityFactory(self.__mol_obj,self.__grid,self.__basis_act)  
         
@@ -147,7 +148,8 @@ class emb_wrapper():
 
             rho = activesys.from_Cocc(Cocc)
         self.__rho = 2.00*rho
-        return 2.00*rho
+        if return_rho:
+           return 2.00*rho
 
     def rho_integral(self):
         if not isinstance(self.__grid,np.ndarray):
@@ -156,7 +158,13 @@ class emb_wrapper():
         sum_rho =np.matmul(self.__rho,w)
         return sum_rho
 
-    def make_embpot(self,rho_on_grid):  # assume this is the real density, i.e it sums to the "real" n. of electrons    
+    def make_embpot(self,rho=None):  # assume this is the real density, i.e it sums to the "real" n. of electrons   
+
+        if isinstance(rho,np.ndarray):
+           rho_on_grid = rho
+        else:
+           rho_on_grid = self.__rho
+ 
         if not self.__nofde:
            density=np.zeros((rho_on_grid.shape[0],10))
            density[:,0] = rho_on_grid

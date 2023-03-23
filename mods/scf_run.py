@@ -307,15 +307,18 @@ def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,pyembopt=None)
 
     # Cocc is in BO basis
     if not pyembopt.nofde or pyembopt.static_field:
-    # define a temporaty Cocc_AO
-       Cocc_AO = np.matmul(U,Cocc)
     # initialize the embedding engine
        embed = fde_utils.emb_wrapper(embmol,pyembopt,bset)
        # here we need the active system density expressed on the grid
-       rho = embed.set_density(Cocc_AO)
-       nel_ACT =embed.rho_integral()
-       print("N.el active system : %.8f\n" % nel_ACT)
-       Vemb = embed.make_embpot(rho)
+    
+       if (not pyembopt.nofde):
+       # define a temporaty Cocc_AO
+          Cocc_AO = np.matmul(U,Cocc)
+          embed.set_density(Cocc_AO) # set density
+          nel_ACT =embed.rho_integral()
+          print("N.el active system : %.8f\n" % nel_ACT)
+
+       Vemb = embed.make_embpot()
 
        # set the embedding potential
        fock_help.set_vemb(Vemb)

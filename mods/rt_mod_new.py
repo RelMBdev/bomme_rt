@@ -104,18 +104,21 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
 
     fock_base = fock_factory(jkclass,Hcore,Stilde, \
                             funcname=func_l,basisobj=bset,exmodel=exmodel)
-    if pyembopt is not None:
-    # define a temporaty Cocc_AO
-       Cocc_tmp = np.matmul(U,C[:,:ndocc])
+    if (not pyembopt.nofde) or pyembopt.static_field:
        
     # initialize the embedding engine
        embed = fde_utils.emb_wrapper(embmol,pyembopt,bset,ovap=np.array(mints.ao_overlap()))
-       # here we need the active system density expressed on the grid
-       rho = embed.set_density(Cocc_tmp)
-       nel_ACT =embed.rho_integral()
-       print("N.el active system : %.8f\n" % nel_ACT)
-       Vemb = embed.make_embpot(rho)
-
+       
+       if not pyembopt.nofde:
+       # define a temporaty Cocc_AO
+          Cocc_tmp = np.matmul(U,C[:,:ndocc])
+          # here we need the active system density expressed on the grid
+          embed.set_density(Cocc_tmp)
+          nel_ACT =embed.rho_integral()
+          print("N.el active system : %.8f\n" % nel_ACT)
+       
+       Vemb = embed.make_embpot()
+        
        # set the embedding potential
        fock_base.set_vemb(Vemb)
     else:

@@ -179,6 +179,7 @@ class real_time():
         iterative = False # set iterative : False by default
         if pyembopt is not None: 
             iterative = pyembopt.iterative
+            nofde = pyembopt.nofde
         ###
         #def mo_fock_mid_forwd_eval(Dp_ti,fock_mid_ti_backwd,i,delta_t,fock_base,dipole,\
         #                        C,S,imp_opts,U,func_h,bsetH,exA=False,maxit= 10 ,Vemb=None,fout=sys.stderr, debug=False)
@@ -189,11 +190,12 @@ class real_time():
                # make new emb potential
                # transform from the progation basis to the atomic basis (either BO or AO)
                # further transform to the AO basis if Umat is not None
-               D_emb = np.matmul(C,np.matmul(self.__Dp,C.T))
-               if U is not None:
-                   D_emb = np.matmul(U,np.matmul(D_emb,U.T))
-               rho = embfactory.set_density(None,D_emb) # set density through the density matrix
-               Vemb = embfactory.make_embpot(rho)
+               if not nofde: # it enforces the iterative condition, for an external static field the iterative procedure would be redundant
+                  D_emb = np.matmul(C,np.matmul(self.__Dp,C.T))
+                  if U is not None:
+                      D_emb = np.matmul(U,np.matmul(D_emb,U.T))
+                  embfactory.set_density(None,D_emb) # set density through the density matrix
+               Vemb = embfactory.make_embpot()
                fock_base.set_vemb(Vemb)
         Eh,Exclow,ExcAAhigh,ExcAAlow,func_t,F_ti,fock_mid, Dp_ti_dt = rtutil.mo_fock_mid_forwd_eval(self.__Dp,self.__Fock_mid,\
                             i_step,np.float_(dt), fock_base, dip_mat, C, ovapm, pulse_opts, U, func_h, bsetH, exA_only,fout=fo,debug=False)
