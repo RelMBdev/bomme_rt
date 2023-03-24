@@ -14,7 +14,7 @@ from localizer import Localizer
 class real_time():
     def __init__(self,Dinit, Fock_init, fock_factory, ndocc, basis, Smat, pulse_opts, delta_t, Cmat, dipmat,\
             out_file=sys.stderr,  basis_acc = None, func_acc=None,U=None,local_basis=False,\
-                                             exA_only=False,occlist=None, virtlist=None):
+                                             exA_only=False,occlist=None, virtlist=None,i_step=0):
       
       self.__ffactory = fock_factory  
       self.__ndocc    = ndocc
@@ -38,7 +38,7 @@ class real_time():
       self.__Umat     = U
       self.__D = Dinit
       self.__outfile = out_file
-      self.__step_count = 0
+      self.__step_count = i_step
       self.__embfactory = None
       self.__embopt = None
       self.__ene_list = []
@@ -101,6 +101,8 @@ class real_time():
         return self.__occlist
     def virtlist(self):
         return self.__virtlist
+    def i_step(self):
+        return self.__step_count
 
     def init_boost(self,selective_pert=False,debug=False):
        dip_mat  = self.__dipmat

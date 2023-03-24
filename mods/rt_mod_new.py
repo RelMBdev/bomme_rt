@@ -164,8 +164,8 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
 
     # in an orthonormal basis Dtilde should be diagonal with oo=1, vv=0
     ODtilde=np.matmul(C_inv,np.matmul(Dtilde,C_inv.T))
-    Dp_0 = rt_prop.get_Dmat()   # the density matrix in the basis of MOs (diagonal : [1]_occ , [0]_virt)
-    print("D[BO] is diagonal in the orbital basis: %s" % np.allclose(Dp_0,ODtilde,atol=1.0e-14))
+    Dp_ti = rt_prop.get_Dmat()   # the density matrix (t=-inf) in the basis of MOs (diagonal : [1]_occ , [0]_virt)
+    print("D[BO] is diagonal in the orbital basis: %s" % np.allclose(Dp_ti,ODtilde,atol=1.0e-14))
 
 
     #nuclear dipole for non-homonuclear molecules
@@ -203,17 +203,6 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
     #for analysis
     dipmo_mat=np.matmul(np.conjugate(C.T),np.matmul(dip_mat,C))
 
-    now = datetime.now()
-    dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
-
-    print("RT-propagation started at: %s" % dt_string)
-    print('Entering in the first step of propagation')
-    start =time.time()
-    cstart =time.process_time()
-
-    #evolve from i=0 to i = 1
-    rt_prop()
-
     ###
     #if ftden:
     #    #tdmat = np.matmul(U,np.matmul((Dtilde-Dtilde),np.conjugate(U.T)))
@@ -227,15 +216,8 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
     #  cube_util.denstocube(phi,Da,S,ndocc,mol,"density",O,N,D)
     #  os.rename("density.cube","td.0000000/density.cube")
     ###
-
-    # a check on the Fock has been removed
-    #check hermicity of fock_mid_init
-    fock_mid_init = rt_prop.get_midpoint_mtx()
-    Ah=np.conjugate(fock_mid_init.T)
-    outfile.write('Fock_mid hermitian: %s\n' % np.allclose(fock_mid_init,Ah))
-
-
-    #weighted dipole
+    
+    #weighted dipole setup orbital list
     if (do_weighted == -2) and isinstance(virtlist,list):
       if virtlist[0] ==-99 and ((not local_basis ) or (not selective_pert)) :
         virtlist=[]
@@ -243,25 +225,17 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
             virtlist.append(m+1)
       else:
         virtlist = rt_prop.virtlist()
-      res = rtutil.dipoleanalysis(dipmo_mat,Dp_0,ndocc,occlist,virtlist,debug)
-      weighted_dip.append(res)
 
-    func_t0 = rt_prop.get_extfield() 
-    Enuc_list.append(-func_t0*Ndip_dir) #just in case of non-zero nuclear dipole
-    #
-    field_list.append(func_t0)
-    D_ti = rt_prop.get_Dmat('AO')  
-    Dp_ti= rt_prop.get_Dmat()
+    now = datetime.now()
+    dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
 
-    if debug :  
-      #trace of D_t1
-      outfile.write('Trace of DS %.8f\n' % np.trace(np.matmul(Stilde,D_ti)).real)
-      outfile.write('Trace of SD.real %.14f\n' % np.trace(np.matmul(Stilde,D_ti.real)))
-      outfile.write('Trace of SD.imag %.14f\n' % np.trace(np.matmul(Stilde,D_ti.imag)))
-      dipval = rt_prop.get_dipole()[0]
-      outfile.write('Dipole %.8f %.15f\n' % (0.000, 2.00*dipval[0].real))
+    print("RT-propagation started at: %s" % dt_string)
+    print('Entering in the first step of propagation')
+    start =time.time()
+    cstart =time.process_time()
 
-    for j in range(1,niter+1):
+
+    for j in range(0,niter+1): # start from i=0
         # for test
         fock_mid_backwd  =  rt_prop.get_midpoint_mtx()
 
