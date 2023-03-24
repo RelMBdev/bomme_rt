@@ -1,0 +1,8 @@
+#!/bin/bash
+export BerthaRootPath=/home/matteo/BERTHA
+export BERTHA_API_PATH=$BerthaRootPath/pybertha/src
+
+
+export PYBERTHA_MOD_PATH="$BerthaRootPath/pybertha/pyemb;$BerthaRootPath/xcfun/build/lib/python;$BerthaRootPath/pybertha/src;$BerthaRootPath/pyadf/src;$BerthaRootPath/berthaingen/pybgen;$BerthaRootPath/pybertha/psi4rt;$BerthaRootPath/pybertha/pyberthaembed;$BerthaRootPath/xcfun/build/lib/python/xcfun"
+
+ulimit -s unlimited
