@@ -160,7 +160,7 @@ class real_time():
        return Dp_0, D_init
 
     def embedding_init(self,embpot,pyembopt):
-      self.__embfactory = embpot
+      self.__embfactory = embpot # this is the same as self.__pyemb in scf_run() class
       self.__embopt = pyembopt
 
     def __call__(self):
@@ -189,16 +189,22 @@ class real_time():
         #if iterative embedding is required  feed fock_base with embedding potential here
         if iterative:
            if ( ( i_step % int(pyembopt.fde_offset/dt) ) == 0.0 ):
+               #if self.__embopt.debug:
+               #      print("i step %i, update Vemb\n" % i_step)
                # make new emb potential
                # transform from the progation basis to the atomic basis (either BO or AO)
                # further transform to the AO basis if Umat is not None
                if not nofde: # it enforces the iterative condition, for an external static field the iterative procedure would be redundant
-                  D_emb = np.matmul(C,np.matmul(self.__Dp,C.T))
-                  if U is not None:
-                      D_emb = np.matmul(U,np.matmul(D_emb,U.T))
-                  embfactory.set_density(None,D_emb) # set density through the density matrix
-               Vemb = embfactory.make_embpot()
-               fock_base.set_vemb(Vemb)
+                  # available matrices: C matrix (trasform a density matrix from orthonormal basis to non-orthonormal basis)
+                  #                     U matrix
+                  embfactory.set_density(None,self.__Dp,self.__ndocc,C,Umat=U) # set electron density on grid through the density matrix (here we use the density represented on the prop. basis,ovapm=Id)
+                  #if self.__embopt.debug:
+                     #check_el_number = embfactory.rho_integral()
+                     #print("rho-integral: %.8f\n" % check_el_number)
+                  Vemb = embfactory.make_embpot()
+                  fock_base.set_vemb(Vemb)
+               else:
+                  print("!! Iterative Vemb update is %s and nofde is %s\n" % (nofde,iterative))    
         Eh,Exclow,ExcAAhigh,ExcAAlow,func_t,F_ti,fock_mid, Dp_ti_dt = rtutil.mo_fock_mid_forwd_eval(self.__Dp,self.__Fock_mid,\
                             i_step,np.float_(dt), fock_base, dip_mat, C, ovapm, pulse_opts, U, func_h, bsetH, exA_only,fout=fo,debug=False)
         self.__field_t = func_t

@@ -76,7 +76,39 @@ class GridFuncFactory(GridDensityFactory):
            print("V is real: %s\n" % (np.allclose(res.imag,np.zeros((nbas,nbas),dtype=np.float_),atol=1.0e-12)))
            np.savetxt("vemb.txt", res.real)
         return res.real
+    # replace the orginal method from GridDensityFactory
+    def from_D(self,D, ndocc, Vminus=None, ovap=None, Umat=None):
+       
+       if (Vminus is None) and (ovap is None):
+          raise Exception("Vminus and ovap are both undefined")
+       if isinstance(Vminus,np.ndarray) or (ovap is None):
+           try:
+             eigvals,eigvecs=np.linalg.eigh(D.real)
+           except scipy.linalg.LinAlgError:
+             print("Error in scipy.linalg.eigh in make_rho from D")
+           #transform to the "non-orthogonal" basis
+           eigvecs =  np.matmul(Vminus,eigvecs)
 
+       else:
+           # The overlap is not the identity matrix
+           temp=np.matmul(ovap,numpy.matmul(D.real,ovap))
+           try:
+             eigvals,eigvecs=scipy.linalg.eigh(temp,ovap,eigvals_only=False)
+           except scipy.linalg.LinAlgError:
+             print("Error in scipy.linalg.eigh in make_rho from D")
+      
+       idx = eigvals.argsort()[::-1]
+       eigvals = eigvals[idx]
+       eigvecs = eigvecs[:,idx]
+
+       if isinstance(Umat,np.ndarray):
+            eigvecs = np.matmul(Umat,eigvecs)
+
+       phi =  GridDensityFactory.phi(self)   #use the handler to access the private members of GridDensityFactory
+       MO = np.matmul(phi,eigvecs[:,:ndocc])
+       MO_dens = np.square(MO)
+       rho = np.einsum('pm->p',MO_dens)
+       return rho
 
 class emb_wrapper():
     def __init__(self,mol_obj,pyembopt,basis_act,stdoutprint=True,ovap=None):
@@ -131,22 +163,28 @@ class emb_wrapper():
        if (pyembopt.debug):
           np.savetxt ("grid.txt", grid)
        self.__grid = grid
+       
+       #init the GridFuncFactory for the active system, i.e to transform all the relevant quantities in the active system basis set representation.
+       self.__gridfactory = GridFuncFactory(self.__mol_obj,self.__grid,self.__basis_act)  
     def grid(self):
         return self.__grid
 
-    def set_density(self,Cocc,Dmat=None,return_rho=False):
-        
-        activesys = GridDensityFactory(self.__mol_obj,self.__grid,self.__basis_act)  
+    def set_density(self,Cocc,Dmat=None,ndocc=None,Vminus=None,return_rho=False,Umat=None): #Cocc has to be expressed in the usual AO basis for convinience i.e in scf_run() class we provide Cocc_AO
+                                                                                            # Vminus is a matrix, with the property  D^AO = V D^{orth} cc(V).  [cc is the complex conjugate operation]
+        #if isinstance(Vminus,np.ndarray): 
+        #   print("dim : %i,%i\n" % Vminus.shape)
         
         if not isinstance(Cocc,np.ndarray) and (Dmat is not None):
             if not isinstance(Dmat,np.ndarray):
                 raise TypeError("Dmat must be np.ndarray")
-            rho = activesys.from_D(Dmat,self.__ovap)
+            rho = self.__gridfactory.from_D(Dmat, ndocc, Vminus= Vminus, ovap= self.__ovap,Umat=Umat)
         else:
             if not isinstance(Cocc,np.ndarray):
                 raise TypeError("C mat must be np.ndarray")
 
-            rho = activesys.from_Cocc(Cocc)
+            rho = self.__gridfactory.from_Cocc(Cocc)
+        if not isinstance(rho,np.ndarray):
+           raise TypeError("rho invalid type")
         self.__rho = 2.00*rho
         if return_rho:
            return 2.00*rho
@@ -187,7 +225,7 @@ class emb_wrapper():
             np.savetxt ("initialpot.txt", self.__initpot)
         if not isinstance(totpot,np.ndarray):
            raise Exception("not a grid function")
-        gridfunc = GridFuncFactory(self.__mol_obj,self.__grid,self.__basis_act)  
+        gridfunc = self.__gridfactory #previously initialized 
         vemb = gridfunc.matrix_from_grid(totpot)
          
         return vemb
@@ -298,18 +336,20 @@ if __name__ == "__main__":
                       'd_convergence': 1e-8})
     ene,wfn = psi4.energy(args.act_func,return_wfn=True)
     Cocc = np.array(wfn.Ca_subset('AO', 'OCC'))
+    Cmat = np.array(wfn.Ca())
+    Dmat = None
     embed = emb_wrapper(molobj,pyembopt,args.act_obs)
     # here we need the active system density expressed on the grid
            
       
-    # use GridDensityFactory
+    # test GridFuncFactory
     grid = embed.grid()
-    activesys = GridDensityFactory(molobj,grid,args.act_obs)  
+    activesys = GridFuncFactory(molobj,grid,args.act_obs)  
         
     if isinstance(Cocc,np.ndarray):
           rho = activesys.from_Cocc(Cocc)
     elif Dmat is not None: #also ovap has to be != None
-          rho = activesys.from_D(Dmat,self.__ovap)
+          rho = activesys.from_D(None,Dmat,Ccoeff=Cmat)
     #check number of electron
     nel_ACT = np.matmul(rho,grid[:,3])
     print("n. el act sys: %.8f\n" % (nel_ACT*2.0))

@@ -61,6 +61,7 @@ class scf_run():
        self.__maxit = maxiter
        self.__maxfde = 0
        self.__fde_thresh = None
+       self.__nofde = True # by default fde is skipped
        self.__e_conv = E_conv 
        self.__d_conv = D_conv
        self.__C = None # collect the final C mat
@@ -69,6 +70,7 @@ class scf_run():
        if opt is not None:
          self.__maxfde = opt.maxit_fde
          self.__fde_thresh = opt.fde_thresh
+         self.__nofde = opt.nofde
     def __call__(self): 
        diis = helper_HF.DIIS_helper(max_vec=6)
          
@@ -135,7 +137,7 @@ class scf_run():
                    raise Exception("Maximum number of SCF cycles exceeded.\n")
                # end scf inner loop
            #update the embedding potential if maxfde >0
-           if self.__maxfde > 0:
+           if not self.__nofde and self.__maxfde > 0:
               vemb_in = fockengine.current_vemb()
               # set the Cocc [from SCF loop] 
               Cocc_tmp = np.matmul(U,Cocc)
@@ -179,7 +181,9 @@ def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,pyembopt=None)
     S12 =S[:nbfA,nbfA:]
     P=np.matmul(S11_inv,S12)
     U[:nbfA,nbfA:]=-1.0*P
-
+    
+    if numbas == nbfA: # the entire system is set as "core"
+      print("U is the identity operator : %s\n" % np.allclose(U,np.eye(nbfA)))
     #S block orthogonal
     Stilde= np.matmul(U.T,np.matmul(S,U))
     np.savetxt("ovap.txt",S)
@@ -222,6 +226,15 @@ def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,pyembopt=None)
     T = np.asarray(mints.ao_kinetic())
     # Build H_core: [Szabo:1996] Eqn. 3.153, pp. 141
     Hcore = T + V
+    
+    # add ecp potential
+    ecp_flag = bset.has_ECP()
+
+
+    if ecp_flag:
+      print("basis has ECP\n")
+      ecp_int = np.array(mints.ao_ecp())
+      Hcore += ecp_int
 
     # Orthogonalizer A = S^(-1/2) using Psi4's matrix power.
     A = mints.ao_overlap()

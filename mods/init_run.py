@@ -35,13 +35,13 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
     print("High Level basis : %s\n" % acc_bset)
     
     # corestr is a string containing only the 'high-level-theory' subsys
-    speclist, geomstr, corestr, natom1 = gparser(fgeom)
+    speclist, geomstr, corestr, natom_bomme = gparser(fgeom)    # natom_bomme is the number of atom of the bomme-fragment (in a bomme+FDE setup)
     
     # dump tmp file
     with open("tmp.xyz","w") as fgeom_act:
-        fgeom_act.write("%s\n" %  str(natom1) )
+        fgeom_act.write("%s\n" %  str(natom_bomme) )
         fgeom_act.write('\n') # black line       
-        tmp = (geomstr.split('\n'))[:natom1]
+        tmp = (geomstr.split('\n'))[:natom_bomme]
         for line in tmp:
          
          unlabeled = line.split()[0].replace('1','') + '   ' + line.split()[1] + '   ' + line.split()[2] + '   ' + line.split()[3]+ '\n'
@@ -65,7 +65,7 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
     
     # used in fragment A basis definition, see below
     molA = Molecule()
-    molA.geom_from_string(corestr,natom1)
+    molA.geom_from_string(corestr)
     
     #molA.display_xyz()
     #molB.display_xyz()
