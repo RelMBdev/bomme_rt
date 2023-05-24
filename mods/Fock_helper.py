@@ -557,7 +557,7 @@ class fock_factory():
          if (func_acc is not None) and (basis_acc is not None):
               results = self.get_bblock_Fock(Cocc,Dmat,func_acc,basis_acc,U,return_ene)
          else:
-              results = get_Fock(Cocc,Dmat,return_ene)
+              results = self.get_Fock(Cocc,Dmat,return_ene)
          if return_ene:
               Eh = results[0]
               Exclow = results[1]

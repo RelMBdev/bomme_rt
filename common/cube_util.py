@@ -91,7 +91,7 @@ def phi_builder(mol,xs,ys,zs,ws,basis):
   phi = np.array(funcs.basis_values()["PHI"])[:npoints, :lpos.shape[0]]
   return phi, lpos,nbas
 
-def orbtocube(mol,L,D,Ca,orblist,basis,tag="tno+",path="./",dens=False):
+def orbtocube(mol,L,D,Ca,orblist,basis,tag="tno+",path="./",dens=False,module=False):
    O,N=cubedata(mol,L,D)
 
 
@@ -134,6 +134,8 @@ def orbtocube(mol,L,D,Ca,orblist,basis,tag="tno+",path="./",dens=False):
 
    phi,lpos,nbas=phi_builder(mol,xs,ys,zs,ws,basis)
    MOnp = np.matmul(phi,Ca)
+   if module:
+       MOnp = np.abs(MOnp)
    if dens:
      rho = np.einsum('pm->p',np.square(MOnp))
 
