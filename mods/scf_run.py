@@ -47,7 +47,7 @@ class bommedata:
     Dtilde : np.ndarray
     ovapm : np.ndarray
     Htilde : np.ndarray
-    func_h : str
+    func_h : None
     ndocc : int
     Umat : np.ndarray
     Bmat : np.ndarray
@@ -94,7 +94,8 @@ class scf_run():
            Dmat_ext = np.matmul(Cocc,Cocc.T)
            for SCF_ITER in range(1, maxiter + 1):
 
-               Eh, Exclow, ExcAAlow, ExcAAhigh, Ftilde=fockengine.get_bblock_Fock(Cocc=Cocc,func_acc=func_h,basis_acc=bsetH,U=U,return_ene=True)
+               #Eh, Exclow, ExcAAlow, ExcAAhigh, Ftilde=fockengine.get_bblock_Fock(Cocc=Cocc,func_acc=func_h,basis_acc=bsetH,U=U,return_ene=True)
+               Eh, Exclow, ExcAAlow, ExcAAhigh, Ftilde=fockengine.get_fock(Cocc=Cocc,func_acc=func_h,basis_acc=bsetH,U=U,return_ene=True)
                
                # DIIS error build and update
                diis_e = np.matmul(Ftilde, np.matmul(Dtilde, Stilde))
@@ -166,7 +167,7 @@ class scf_run():
     def epsilon(self):
        return self.__eigvals
 
-def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,pyembopt=None):
+def run(jkclass,embmol,bset,bsetH,guess,func_high,func_low,exmodel,wfn,pyembopt=None):
     
     numbas = bset.nbf()
     nbfA = bsetH.nbf()
@@ -244,7 +245,7 @@ def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,pyembopt=None)
     #initialise fock_factory
     from Fock_helper import fock_factory
     # for now exmodel=0 is assumed
-    fock_help = fock_factory(jkclass,Hcore,Stilde,funcname=func_l,basisobj=bset,exmodel=exmodel)
+    fock_help = fock_factory(jkclass,Hcore,Stilde,funcname=func_low,basisobj=bset,exmodel=exmodel)
 
     B = psi4.core.Matrix.from_array(Stilde)
     B.power(-0.5, 1.e-16)
@@ -340,12 +341,15 @@ def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,pyembopt=None)
 
     # define the common quantities for bomme   
     data_scf = bommedata
-    
+   
+    if func_high == "None":
+        data_scf.func_h = None
+    else: 
+        data_scf.func_h = func_high
     data_scf.Cocc   = Cocc
     data_scf.Dtilde = Dtilde
     data_scf.ovapm = Stilde
     data_scf.Htilde = Htilde
-    data_scf.func_h = func_h
     data_scf.Umat = U
     data_scf.Bmat = B
     data_scf.return_ene = True
@@ -425,7 +429,7 @@ def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,pyembopt=None)
     Fscf=np.matmul(U.T,np.matmul(Ftilde,U))
     Cocc_scf=np.matmul(U,Cocc)
 
-    Eh, Exclow, ExcAAlow, ExcAAhigh, dummy=fock_help.get_bblock_Fock(Cocc=Cocc_scf,func_acc=func_h,basis_acc=bsetH,U=dummy_U,return_ene=True)
+    Eh, Exclow, ExcAAlow, ExcAAhigh, dummy=fock_help.get_fock(Cocc=Cocc_scf,func_acc=data_scf.func_h,basis_acc=bsetH,U=dummy_U,return_ene=True)
     
     SCF_E = Eh + Exclow + ExcAAhigh -ExcAAlow + Enuc + 2.0*np.trace(np.matmul(Dscf,Hcore))
     print('Final SCF (Density Corrected) energy: %.8f hartree\n' % SCF_E)
@@ -452,6 +456,6 @@ def run(jkclass,embmol,bset,bsetH,guess,func_h,func_l,exmodel,wfn,pyembopt=None)
     
     wfn_BObasis = {'Fock' : Ftilde, 'Hcore': Htilde, 'epsilon_a' : eigvals, 'energy': SCF_E, 'Dmtx' : Dtilde, 'Ccoeff' : C, 'Ovap' : Stilde, 'Umat' : U,\
                     'nbf_A': nbfA, 'nbf_tot' : numbas, 'ndocc' : ndocc,'jkfactory' : jkclass,\
-                    'func_h': func_h, 'func_l' : func_l, 'exmodel':exmodel, 'molecule' : embmol }
+                    'func_h': data_scf.func_h , 'func_l' : func_low, 'exmodel':exmodel, 'molecule' : embmol }
     
     return wfn, wfn_BObasis

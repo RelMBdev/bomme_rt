@@ -10,11 +10,103 @@ if modpaths is not None :
     for path in modpaths.split(";"):
         sys.path.append(path)
 from localizer import Localizer 
+class abs_pot():
+    def __init__(self,cap_mat,Cmat,Umat,dt=0.1,cap_on=False):
+        self.__exp_mat = None
+        self.__exp_mat_half_ts = None # for delta_t/2
+        self.__eigvec = None
+        self.__eigval = None
+        self.__delta_t = dt
+        #self.__do_cap = None
+        
+
+        self.__do_cap = cap_on
+        if self.__do_cap:
+            if isinstance(Umat,np.ndarray):
+                cap_mat = np.matmul(cap_mat,Umat)
+                cap_mat = np.matmul(Umat.T,cap_mat)
+            
+            # transform to the propagation basis
+            
+            tmp = np.matmul(cap_mat,Cmat)
+            tmp = np.matmul(Cmat.T,tmp)
+            
+            #diagonalize so that we can form exp(-A*dt/2) diagonal elements
+            try:
+               eigval,eigvec=np.linalg.eigh(tmp)
+            except np.linalg.LinAlgError:
+                print("check CAP\n")
+                raise Exception("Error in numpy.linalg.eigh of inputted matrix")
+            idx = eigval.argsort()[::-1]
+            eigval = eigval[idx]
+            eigvec = eigvec[:,idx]
+            self.__eigval =eigval
+            self.__eigvec =eigvec
+
+    def is_cap_on(self):   # verify fuction
+        return self.__do_cap
+    def time_step(self):
+        return self.__delta_t
+
+    def cap_matrix(self,dt_half=False):
+        # the exponential of the CAP is already built-in to fullfill the split-operator form -> i.e exp(-W*Dt/2)
+        # -> exp( -i(F(t+Dt/2) -iW) * Dt ) approx exp(-W *Dt/2) exp(-i F(t+Dt/2) * Dt) exp(-W *Dt/2)
+        # Further if exp( -iF(t+Dt'/2) * Dt') where Dt' = Dt/2 is needed (in MMUT) we provide the dt_half keyword
+        dt = self.__delta_t
+        if self.__do_cap:
+            if not isinstance(self.__exp_mat_half_ts,np.ndarray): # in case already exists skip
+               diag=np.exp(-0.5*self.__eigval*np.float_(dt*0.5) )
+             
+               dmat=np.diagflat(diag)
+               self.__exp_mat_half_ts = np.matmul(self.__eigvec ,np.matmul(dmat,self.__eigvec.T))
+               #assign
+            # form the exp operator
+           
+            if not isinstance(self.__exp_mat,np.ndarray): # in case already exists
+               diag=np.exp(-0.5*self.__eigval*dt)
+             
+               dmat=np.diagflat(diag)
+               self.__exp_mat = np.matmul(self.__eigvec ,np.matmul(dmat,self.__eigvec.T))
+            if dt_half:
+                res = self.__exp_mat_half_ts
+            else:
+                res = self.__exp_mat
+            return res
+        else:
+            return None
+
+class operator_container():
+    def __init__(self,dipmat,Cmat,pulse_opts,kind='dipole'):
+        self.__res = None
+
+        if isinstance(dipmat,list):
+            tmp = dipmat[0]
+        else:
+            tmp = dipmat
+
+        if kind == 'dipole':
+            self.__res = np.float_(-1.00)*tmp #   -> -dipole*Field
+        elif kind == 'scatt':
+            try :
+              C_inv=np.linalg.inv(Cmat)
+            except np.linalg.LinAlgError:
+              print("Error in np.linalg.inv")
+
+            dip_mo = np.matmul( Cmat.T, np.matmul(tmp,Cmat) )
+
+            q_boost =  pulse_opts['qvec']  # the q vector along boost-direction (to be generalized)
+            u0 = rtutil.exp_opmat(dip_mo,np.float_(-q_boost))
+            scatt_op = np.matmul( C_inv.T, np.matmul(u0,C_inv) )
+            self.__res = scatt_op
+        else:
+            raise Exception("not implemented\n")
+    def get_matrix(self):
+        return self.__res
 
 class real_time():
     def __init__(self,Dinit, Fock_init, fock_factory, ndocc, basis, Smat, pulse_opts, delta_t, Cmat, dipmat,\
             out_file=sys.stderr,  basis_acc = None, func_acc=None,U=None,local_basis=False,\
-                                             exA_only=False,occlist=None, virtlist=None,i_step=0):
+                                             exA_only=False,occlist=None, virtlist=None,i_step=0,prop_type='empc',ext_type='dipole',debug=False):  #default exponential midpoint predictor-corrector
       
       self.__ffactory = fock_factory  
       self.__ndocc    = ndocc
@@ -31,9 +123,11 @@ class real_time():
       self.__exA_only = exA_only
       self.__Dp       = None
       self.__Fock_mid = Fock_init
+      self.__Dp_back  = None
       self.__ovapm    = Smat # it can represent either overlap of AO basis functions or BO b. funcs
       self.__Cmat  = Cmat    # Cmat contains MO coefficients (either on AO basis or BO basis)
       self.__dipmat = None
+      self.__field_op = None
       self.__perpdip = []
       self.__Umat     = U
       self.__D = Dinit
@@ -45,15 +139,25 @@ class real_time():
       self.__dip_list = []
       self.__dperp0_list = [] # the expectation values  of perpendicular components (wrt the boost) of dipole
       self.__dperp1_list = []
-      self.__field_t = []
+      self.__field_t = None
+      self.__field_list = []
+      self.__do_cap = False
+      self.__cap_exp = None # exp(-A*dt/2)
+      self.__prop_type = prop_type
+      self.__ext_type = ext_type # dipole approximation ?
+      self.__debug = debug
 
       if isinstance(dipmat,list):
-          self.__dipmat = dipmat.pop(0)
-          for mtx in dipmat:
+          self.__dipmat = dipmat[0]
+          for mtx in dipmat[1:]:
                self.__perpdip.append(mtx)
       else:
           self.__dipmat= dipmat
         
+      #set the field operator (generalize to non dipole-approximation cases)
+
+      self.__field_op = operator_container(dipmat,Cmat,pulse_opts,ext_type)
+
       if U is not None:
           if not isinstance(U, np.ndarray):
               raise TypeError(" U must be nd.ndarray")
@@ -162,20 +266,65 @@ class real_time():
     def embedding_init(self,embpot,pyembopt):
       self.__embfactory = embpot # this is the same as self.__pyemb in scf_run() class
       self.__embopt = pyembopt
+ 
+    def do_cap(self,flag=True):
+        self.__do_cap = flag
 
-    def __call__(self):
+    def set_CAP(self,cap_mat):
+        # the CAP is provided as a matrix expressed in the AO basis
+        # U matrix is needed if transformation to the BO basis is required
+        if not self.__do_cap:
+            print("CAP is not active\n")
+        #init the abs_pot instance 
+        tmp = abs_pot(cap_mat,self.__Cmat,self.__Umat, dt=self.__delta_t, cap_on=self.__do_cap) # dt/2 for the cap (split-operator form) is alread accounted
+        self.__cap_exp = tmp
+        return tmp
+
+    def cap_clear(self):
+        self.__cap_exp = None
+
+    def __onestep_prop(self):
+        #cap is provided as exp of the cap matrix itself
+        #aliases
         i_step = self.__step_count
-        dt = self.__delta_t
-        U = self.__Umat
         C = self.__Cmat # can be generalized to loewdin orthogonalization
         pulse_opts = self.__pulse_param
-        fock_base = self.__ffactory
         dip_mat = self.__dipmat
         ovapm = self.__ovapm
         fo = self.__outfile
         bsetH = self.__basisobj_acc
         func_h = self.__func_acc
         exA_only = self.__exA_only
+
+        #backward_mid is a np.ndarray container for either the fock(i-1/2) or Density(i-1/2)
+        backward_mid = np.empty_like(ovapm) 
+        
+        if self.__prop_type == 'empc':
+               Eh,Exclow,ExcAAhigh,ExcAAlow,func_t,F_ti,backward_mid, Dp_ti_dt = rtutil.mo_fock_mid_forwd_eval(self.__Dp,self.__Fock_mid,\
+                              i_step,np.float_(self.__delta_t), self.__ffactory, self.__field_op, C, ovapm, pulse_opts, self.__Umat, func_h,\
+                              bsetH, exA_only,fout=fo,debug=self.__debug,cap=self.__cap_exp)
+        elif self.__prop_type == 'mmut':
+               #raise Exception("not available\n")
+               Eh,Exclow,ExcAAhigh,ExcAAlow,func_t,F_ti,backward_mid, Dp_ti_dt = rtutil.prop_mmut(self.__Dp,self.__Dp_back,\
+                              i_step,np.float_(self.__delta_t), self.__ffactory, self.__field_op, C, ovapm, pulse_opts, self.__Umat,func_h,\
+                              bsetH,exA_only, fout=fo, debug=self.__debug, cap=self.__cap_exp)
+        elif self.__prop_type == 'epep2':
+               #raise Exception("not available\n")
+               Eh,Exclow,ExcAAhigh,ExcAAlow,func_t,Dp_ti_dt = rtutil.epep2(self.__Dp,i_step,np.float_(self.__delta_t),self.__ffactory, self.__field_op,\
+                        C,pulse_opts,self.__Umat,func_h,bsetH,exA=exA_only,maxiter= 10 ,fout=fo, cap = None, thresh=1.0e-5, debug=self.__debug)
+        elif self.__prop_type == 'etrs':       
+               Eh,Exclow,ExcAAhigh,ExcAAlow,func_t,Dp_ti_dt = rtutil.ETRS_wrap(self.__Dp,i_step,np.float_(self.__delta_t),self.__ffactory, self.__field_op,\
+                        C,pulse_opts,self.__Umat,func_h,bsetH,exA=exA_only,maxiter= 10 ,fout=fo, cap = None, thresh=1.0e-5, debug=self.__debug)
+        #propagators go here       
+        return (Eh,Exclow,ExcAAhigh,ExcAAlow),func_t,backward_mid,Dp_ti_dt
+
+    def __call__(self):
+        i_step = self.__step_count
+        dt = self.__delta_t
+        fock_base = self.__ffactory
+        U = self.__Umat
+        dip_mat = self.__dipmat
+        C = self.__Cmat 
         pyembopt = self.__embopt
         embfactory = self.__embfactory
         iterative = False # set iterative : False by default
@@ -205,9 +354,15 @@ class real_time():
                   fock_base.set_vemb(Vemb)
                else:
                   print("!! Iterative Vemb update is %s and nofde is %s\n" % (nofde,iterative))    
-        Eh,Exclow,ExcAAhigh,ExcAAlow,func_t,F_ti,fock_mid, Dp_ti_dt = rtutil.mo_fock_mid_forwd_eval(self.__Dp,self.__Fock_mid,\
-                            i_step,np.float_(dt), fock_base, dip_mat, C, ovapm, pulse_opts, U, func_h, bsetH, exA_only,fout=fo,debug=False)
-        self.__field_t = func_t
+        ene_container,func_t,fock_mid, Dp_ti_dt = self.__onestep_prop()
+       
+        self.__field_t = func_t     # collect quantities
+        self.__field_list.append(func_t)
+        Eh       =ene_container[0]
+        Exclow   =ene_container[1]
+        ExcAAhigh=ene_container[2]
+        ExcAAlow =ene_container[3] 
+        
         # expressed in AO basis
         Hcore = fock_base.H()
         if U is not None:
@@ -226,9 +381,13 @@ class real_time():
 
 
         self.__dip_list.append(dipole_avg)
-
-        #update intermidiate (forward) fock matrix
-        self.__Fock_mid = fock_mid
+        
+        if self.__prop_type == 'empc': # for DEBUG  or self.__prop_type == 'etrs':
+           #update intermidiate (forward) fock matrix
+           self.__Fock_mid = fock_mid
+        else: 
+           self.__Dp_back = fock_mid #alisased
+           
         self.__Dp = Dp_ti_dt
         #real coeffs
         self.__D = np.matmul(C,np.matmul(Dp_ti_dt,C.T))
@@ -255,8 +414,29 @@ class real_time():
     def get_energy(self):
         return self.__ene_list
 
-    def get_extfield(self):
+    def get_field_list(self):
+        return self.__field_list
+
+    def get_extfield(self):     #current value at iteration k
         return self.__field_t
 
     def __del__(self):  # ? destructor
       return None
+    def set_D(self,Dmat,basis='MO'):
+        if basis == 'AO':
+            self.__D =Dmat
+        elif basis == 'MO':
+            self.__Dp = Dmat
+
+    def set_Fock(self,Fmat):
+        self.__Fock_mid = Fmat
+    def clear(self,i_step=0):
+        self.__step_count = i_step
+        self.__Fock_mid = None
+        self.__Dp = None
+        self.__D  = None
+        self.__ene_list = []
+        self.__dip_list = []
+        self.__dperp0_list = [] # the expectation values  of perpendicular components (wrt the boost) of dipole
+        self.__dperp1_list = []
+        self.__field_t = []

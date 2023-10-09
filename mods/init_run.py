@@ -12,8 +12,30 @@ if modpaths is not None :
 
 from molecule import Molecule, gparser
 
+class checkpoint_data:
+    def __init__(self,wfn,func_h = 'blyp',func_l = 'blyp',restart=False, json_data = None):
+        self.__restart = restart
+        self.__hfunc = func_h
+        self.__lfunc = func_l
+        self.__wfn = wfn # can be either a dummy psi4 wfn object or a real wfn  
+        self.__is_hybrid = None
+        if restart:
+          self.__is_hybrid = json_data["is_x_hybr"]
+        else:
+            if func_l.upper() == 'HF':
+                self.__is_hybrid = True # is Hartree-Fock
+            else:    
+                pot_type = wfn.V_potential()
+                self.__is_hybrid = pot_type.functional().is_x_hybrid()
+
+           
+    def get_specs(self):
+        res = {'func_h' : self.__hfunc, 'func_l' : self.__lfunc, 'lfunc_hyb' : self.__is_hybrid} 
+        return res
+
+
 def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
-                charge,numpy_memory=8,eri=None,rt_HF_iexch=False, exch_model=0, debug=False):
+                charge,numpy_memory=8,eri=None,rt_HF_iexch=False, exch_model=0, debug=False, restart=False, restart_json = None):
     # rt_HF_iexch flag determines if the imaginary part of the exchange 
     # is accounted in the rt-evolution
     # scf_type controls the type of scf type in the initialization (the GS density
@@ -110,15 +132,18 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
     #mol_wfn = psi4.core.Wavefunction.build( \
     #                    embmol,psi4.core.get_global_option('basis'))
     #mol_wfn.basisset().print_detail_out()
-
-    ene,wfn=psi4.energy(func_l ,return_wfn=True)
-    #warning if the low-level functional is hybrid/lrc/need HF exch
-    V_pot = wfn.V_potential()
+    if not restart:
+       ene,wfn=psi4.energy(func_l ,return_wfn=True)
+    else:
+       #build dummy wfn just to refresh mints & co 
+       wfn = psi4.core.Wavefunction.build(mol, psi4.core.get_global_option('BASIS')) 
+    #check if the low-level functional is hybrid/lrc/need HF exch
+    checkdata = checkpoint_data(wfn, func_h, func_l, restart, json_data = restart_json)
     
-    if func_l == 'hf':     
+    if func_l.upper() == 'HF':     
          fun_low_hfexch = True
-    if (V_pot is not None):
-        if V_pot.functional().is_x_hybrid() :
+    if (checkdata is not None):
+        if checkdata.get_specs()['lfunc_hyb']:
          fun_low_hfexch = True
          print("The low-level-theory functional requires HF exch")
         else:

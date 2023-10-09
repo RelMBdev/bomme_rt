@@ -44,7 +44,7 @@ class jkfactory():
         self.__rtfit = real_time # use fitted integral / full 4-index eri the get the correction to the real-time K matrix when jkclass is on
         if jknative:
             #intialize native Psi4 jk object
-            if (scf_type=='DIRECT' or scf_type=='PK'): 
+            if (scf_type=='DIRECT' or scf_type=='PK' or scf_type=='CD') : 
                print("using %s scf and JK class\n" % scf_type)
                jk = psi4.core.JK.build(bset)
             elif scf_type == 'MEM_DF' or scf_type == 'DISK_DF':
@@ -437,6 +437,8 @@ class fock_factory():
           if return_ene:
              # if return_ene=True in get_xcpot() a tuple will be returned
              res = self.__Hcore +2.0*J +Vxc[0]
+             if not isinstance(Dmat,np.ndarray):
+                 Dmat = np.matmul(Cocc,np.conjugate(Cocc.T))
              Jene = 2.00*np.trace( np.matmul(J,Dmat) )
              if isinstance(self.__vemb,np.ndarray):
                  res += self.__vemb
@@ -551,8 +553,8 @@ class fock_factory():
     # define a general function to simulate function overloading
     def get_fock(self,Cocc=None,Dmat=None,func_acc=None,basis_acc=None,U=None,return_ene=False):
 
-         ExcAAlow  = None
-         ExcAAhigh = None
+         ExcAAlow  = 0.  # were None
+         ExcAAhigh = 0.
 
          if (func_acc is not None) and (basis_acc is not None):
               results = self.get_bblock_Fock(Cocc,Dmat,func_acc,basis_acc,U,return_ene)
@@ -566,7 +568,7 @@ class fock_factory():
                 ExcAAhigh = results[3]
                 fock_mtx  = results[4]
               else:  
-                fock_mtx = results[3]  
+                fock_mtx = results[2]  
               return Eh, Exclow, ExcAAlow, ExcAAhigh,fock_mtx  
          else:  
               return results

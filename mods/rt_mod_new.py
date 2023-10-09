@@ -33,7 +33,8 @@ import fde_utils
 # selective_pert : bool.  Turn on selective perturbation. See Repisky M et al 2015
 # local_basis : bool . Use a localized basis instead of ground-state MOs
 # exA_only : excite only A subsystem; either using local_bas or selective_pert or numerical approach
-def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_select, selective_pert, local_basis, exA_only, numpy_mem,debug,pyembopt=None):
+def run_rt_iterations(iter_opts, field_opts, bset, bsetH, wfn_bo, embmol, direction, mo_select, selective_pert, local_basis, exA_only,\
+                     numpy_mem,debug,pyembopt=None, capflag = False):
     # TODO: the parameter of the propagation (e.g delta_t, n_iter are derivede locally) can be passed from outside
     numbas = wfn_bo['nbf_tot']
     nbf_A = wfn_bo['nbf_A']
@@ -75,13 +76,17 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
     #         raise Exception("Check list of frequencies for ftden")
     ###
 
-    field_opts, calc_params = rtutil.set_params(inputfname)
+    #field_opts, calc_params = rtutil.set_params(inputfname)
+    calc_params = iter_opts[2]  # pick from the tuple
+    init_iter = iter_opts[0]
+    end_iter = iter_opts[1]
 
     if field_opts['imp_type'] == 'analytic' :
         analytic = True
     else:
         analytic = False
-
+    
+    prop_id = calc_params['prop_id']
     #dt in a.u
     dt =  calc_params['delta_t']
     #time_int in atomic unit
@@ -151,7 +156,39 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
     from rt_base import real_time
     rt_prop = real_time(Dtilde, Ftilde, fock_base, ndocc, bset, Stilde, field_opts, dt, C, dipmat_list,\
                            out_file=outfile,  basis_acc = bsetH, func_acc=func_h,U=U,local_basis=local_basis,\
-                                             exA_only=exA_only,occlist=occlist, virtlist=virtlist)
+                                             exA_only=exA_only,occlist=occlist, virtlist=virtlist, prop_type=prop_id,debug=debug)
+    from operator_ongrid  import function_cap_xyz
+    # function_cap_xyz(grid_mtx, ndim,mol, basisobj, r0=9.3, eta=4., thresh=10.,\
+    #                                           file_out=sys.stderr, debug=False)
+
+    rt_prop.do_cap(capflag)
+    if capflag:
+       # get CAP params from pulse_opts dictionary
+       cap_r0 = field_opts['r0']
+       cap_eta = field_opts['eta']
+       cap_thresh = field_opts['cthresh']
+       
+       # build a grid on the fly
+       functional_tmp = psi4.driver.dft.build_superfunctional("svwn", True)[0] # True states that we're working with a restricted system
+       Vpot_tmp       = psi4.core.VBase.build(bset, functional_tmp, "RV")         # This object contains different methods associated with DFT methods and the grid.
+                                                                               # "RV" states that this is a restricted system consystent with 'functional'
+       Vpot_tmp.initialize() # We initialize the object
+
+       # The grid (and weights) can then be extracted from Vpot.
+       x, y, z, w = Vpot_tmp.get_np_xyzw()
+
+       xs = psi4.core.Vector.from_array(x)  # as psi4.Vector
+       ys = psi4.core.Vector.from_array(y)
+       zs = psi4.core.Vector.from_array(z)
+       ws = psi4.core.Vector.from_array(w)
+       grid_list = (xs,ys,zs,ws)
+       
+       Vpot_tmp.finalize()
+       cap_mtx_AO = function_cap_xyz(grid_list, bset.nbf(), embmol, bset, r0=cap_r0, eta=cap_eta, thresh=cap_thresh)
+
+       capobj = rt_prop.set_CAP(cap_mtx_AO) # AO->MO
+    else:   # for debug and testing
+       capobj = rt_prop.set_CAP(None)  
      
     if pyembopt is not None:
           rt_prop.embedding_init(embed,pyembopt)
@@ -235,7 +272,7 @@ def run_rt_iterations(inputfname, bset, bsetH, wfn_bo, embmol, direction, mo_sel
     cstart =time.process_time()
 
 
-    for j in range(0,niter+1): # start from i=0
+    for j in range(init_iter,end_iter+1): # start from i=0
         # for test
         fock_mid_backwd  =  rt_prop.get_midpoint_mtx()
 

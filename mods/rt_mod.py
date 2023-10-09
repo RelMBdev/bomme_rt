@@ -74,7 +74,7 @@ def set_input(fgeom):
   f.close()
   return geomobj, mol,numat,species
 ###################################################################
-
+# LEGACY , updated version in rtutil
 def set_params(fname):
     my_dict = {}
     with open(fname) as fileobj:

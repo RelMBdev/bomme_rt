@@ -60,13 +60,17 @@ def cubedata(gobj,L = [7.0,7.0,7.0],D = [0.1,0.1,0.1]):
 
 #h2o.print_out_in_bohr()
 #basis is the basis object
-def phi_builder(mol,xs,ys,zs,ws,basis):
+def phi_builder(mol,xs,ys,zs,ws,basis,target='DFT'):   # if target == 'CUBE' this will affect the basis_extent
+                                                       # through the BasisExtents(basis,  -> delta <-)  !
   
-  delta = 1.0e-2
 
   #basis = psi4.core.BasisSet.build(mol, 'ORBITAL',psi4.core.get_global_option('basis')) # or set the basis from input
   #basis = psi4.core.BasisSet.build(mol, 'ORBITAL',basis_set)
-  basis_extents = psi4.core.BasisExtents(basis,delta)
+  if target == 'CUBE':
+    epsilon = psi4.core.get_global_option("CUBIC_BASIS_TOLERANCE")
+  else:
+    epsilon = psi4.core.get_global_option("DFT_BASIS_TOLERANCE")
+  basis_extents = psi4.core.BasisExtents(basis,epsilon)
 
   blockopoints = psi4.core.BlockOPoints(xs, ys, zs, ws,basis_extents)
   npoints = blockopoints.npoints()
@@ -132,7 +136,7 @@ def orbtocube(mol,L,D,Ca,orblist,basis,tag="tno+",path="./",dens=False,module=Fa
    zs = psi4.core.Vector.from_array(res[:,2])
    ws = psi4.core.Vector.from_array(w)
 
-   phi,lpos,nbas=phi_builder(mol,xs,ys,zs,ws,basis)
+   phi,lpos,nbas=phi_builder(mol,xs,ys,zs,ws,basis,'CUBE')
    MOnp = np.matmul(phi,Ca)
    if module:
        MOnp = np.abs(MOnp)
@@ -369,7 +373,7 @@ def denstocube(mol,basis,Dens,S,ndocc,tag,L,D=[0.2,0.2,0.2]):
     zs = psi4.core.Vector.from_array(res[:,2])
     ws = psi4.core.Vector.from_array(w)
     
-    phi,lpos,nbas=phi_builder(mol,xs,ys,zs,ws,basis)
+    phi,lpos,nbas=phi_builder(mol,xs,ys,zs,ws,basis,'CUBE')
     
     
     temp = np.matmul(S,np.matmul(Dens.real,S))

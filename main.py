@@ -13,6 +13,7 @@ from scf_run import run
 from init_run import initialize
 from fde_utils import embedoption
 import argparse
+import rtutil
 ####################################################################################
 
 if __name__ == "__main__":
@@ -74,6 +75,8 @@ if __name__ == "__main__":
                        default=False, action="store_true")
     parser.add_argument("-f","--input", help="Set input parameters filename [defaul input.inp]", 
                        required=False, default="input.inp", type=str)
+    parser.add_argument("--use_cap", help="Set Complex Absorbing Potential", required=False,
+            default=False, action="store_true")
     parser.add_argument("--fde", help="FDE on", required=False,
             default=False, action="store_true")
 
@@ -110,7 +113,11 @@ if __name__ == "__main__":
             default=0.1, type = float)
     parser.add_argument("-i","--iterative", help="Set iterative update of the embedding potential", required=False,
             default=False, action="store_true")
-   
+    ### restart flag ## 
+    parser.add_argument("--restart", help="restart from checkpoint", required=False,
+            default=False, action="store_true")
+    parser.add_argument("--restart_dumpnum", help="Set the number of iterations between checkpoints", required=False,
+            default=100, type=int)
     args = parser.parse_args()
 
     
@@ -170,8 +177,25 @@ if __name__ == "__main__":
            print("File ", fnameinput, " does not exist")
            exit(1)
 
+       field_opts, calc_params = rtutil.set_params(fnameinput)
+    
+
+       # get the number of iterations
+       dt =  calc_params['delta_t']
+       #time_int in atomic unit
+       time_int=calc_params['time_int']
+       end_iter=int(time_int/dt)
+       
+       if args.restart:  # in case of restart init_iter != 0
+           init_iter = -999
+       else:
+           init_iter = 0
+
+       iter_opts = (init_iter,end_iter,calc_params)
+
        print("Startig real-time tddft computation")
        print()
        # call rt using the four indices I tensor (for small systems due to memory requirements)
-       rt_mod_new.run_rt_iterations(fnameinput, bset, bsetH, wfnBO, psi4mol, args.axis, args.select, args.selective_pert, args.local_basis, args.exciteA_only, args.numpy_mem, args.debug,pyembopt)
+       rt_mod_new.run_rt_iterations(iter_opts, field_opts, bset, bsetH, wfnBO, psi4mol, args.axis, args.select, args.selective_pert, args.local_basis,\
+               args.exciteA_only, args.numpy_mem, args.debug,pyembopt, args.use_cap)
          
