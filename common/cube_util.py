@@ -71,6 +71,7 @@ def phi_builder(mol,xs,ys,zs,ws,basis,target='DFT'):   # if target == 'CUBE' thi
   else:
     epsilon = psi4.core.get_global_option("DFT_BASIS_TOLERANCE")
   basis_extents = psi4.core.BasisExtents(basis,epsilon)
+  import pdb; pdb.set_trace();
 
   blockopoints = psi4.core.BlockOPoints(xs, ys, zs, ws,basis_extents)
   npoints = blockopoints.npoints()
@@ -95,33 +96,75 @@ def phi_builder(mol,xs,ys,zs,ws,basis,target='DFT'):   # if target == 'CUBE' thi
   phi = np.array(funcs.basis_values()["PHI"])[:npoints, :lpos.shape[0]]
   return phi, lpos,nbas
 
-def orbtocube(mol,L,D,Ca,orblist,basis,tag="tno+",path="./",dens=False,module=False):
-   O,N=cubedata(mol,L,D)
+def get_block_points(grid,basis,target='CUBE'):
+   if target == 'CUBE':
+     epsilon = psi4.core.get_global_option("CUBIC_BASIS_TOLERANCE")
+   else:
+     epsilon = psi4.core.get_global_option("DFT_BASIS_TOLERANCE")
+   max_points = psi4.core.get_global_option("DFT_BLOCK_MAX_POINTS")  # Maximum number of points per block
+   npoints    = grid.shape[1]                                        # Total number of points
+   extens     = psi4.core.BasisExtents(basis, epsilon)
+   nblocks    = int(np.floor(npoints/max_points))
+   remainder  = npoints - (max_points * nblocks)
+   blocks     = []
+
+   max_functions = 0
+
+   # Run through blocks
+   idx = 0 
+   inb = 0
+   for nb in range(nblocks+1):
+       x = psi4.core.Vector.from_array(grid[0][idx : idx + max_points if inb < nblocks else idx + remainder])
+       y = psi4.core.Vector.from_array(grid[1][idx : idx + max_points if inb < nblocks else idx + remainder])
+       z = psi4.core.Vector.from_array(grid[2][idx : idx + max_points if inb < nblocks else idx + remainder])
+       if target == 'CUBE':
+           w = psi4.core.Vector.from_array(np.zeros(max_points))
+       else:
+           w = psi4.core.Vector.from_array(grid[3][idx : idx + max_points if inb < nblocks else idx + remainder])
 
 
+       blocks.append( psi4.core.BlockOPoints(x, y, z, w, extens) )
+       idx += max_points if inb < nblocks else remainder
+       inb += 1
+       max_functions = max_functions if max_functions > len(blocks[-1].functions_local_to_global()) \
+                                                     else len(blocks[-1].functions_local_to_global())
+    
+    
+   points_func = psi4.core.RKSFunctions(basis, max_points, max_functions)
+   points_func.set_ansatz(0)
+
+   return points_func, blocks, npoints
+
+
+def orbtocube(mol,Lx,Dx,Ca_np,orblist,basis,tag="tno+",path="./",dens=False,module=False):
+
+   dim_check = np.matmul(Ca_np,Ca_np.T)
+   if Ca_np.shape[0] != basis.nbf():
+       raise ValueError("wrong dimension Ca[0] != nbf\n")
+
+   # create a grid (cube)
+   O,N=cubedata(mol,Lx,Dx)
+   
    nx = N[0]+1
    ny = N[1]+1
    nz = N[2]+1
 
    ntot= nx*ny*nz
-   x=np.zeros(ntot)
-   y=np.zeros(ntot)
-   z=np.zeros(ntot)
-   w=np.ones(ntot)
+   
    #aux variables
    x_ax=np.zeros(nx)
    y_ax=np.zeros(ny)
    z_ax=np.zeros(nz)
    grid = []
    for i in range(nx):
-       x_ax[i] = O[0]+D[0]*i
+       x_ax[i] = O[0]+Dx[0]*i
    
    for i in range(ny):
-       y_ax[i] = O[1]+D[1]*i
+       y_ax[i] = O[1]+Dx[1]*i
   
 
    for i in range(nz):
-       z_ax[i] = O[2]+D[2]*i
+       z_ax[i] = O[2]+Dx[2]*i
 
 
    for i in range(nx):
@@ -130,19 +173,42 @@ def orbtocube(mol,L,D,Ca,orblist,basis,tag="tno+",path="./",dens=False,module=Fa
                tmp = np.array([x_ax[i],y_ax[j],z_ax[k]])
                grid.append(tmp)
 
-   res = np.array(grid)
-   xs = psi4.core.Vector.from_array(res[:,0])
-   ys = psi4.core.Vector.from_array(res[:,1])
-   zs = psi4.core.Vector.from_array(res[:,2])
-   ws = psi4.core.Vector.from_array(w)
+   grid = np.array(grid).T
 
-   phi,lpos,nbas=phi_builder(mol,xs,ys,zs,ws,basis,'CUBE')
-   MOnp = np.matmul(phi,Ca)
+    
+   points_func, blocks, npoints = get_block_points(grid,basis,target='CUBE')
+   orbitals_p = np.zeros( (basis.nbf(), npoints) ) 
+   
+   #print("n points: %i\n" % npoints)
+   # And proceed just like we did with the LDA kernet tutorial. 
+
+   points_func.set_pointers( psi4.core.Matrix.from_array(dim_check) )
+   if not isinstance(Ca_np,np.ndarray):
+       raise TypeError("Ca must be np.ndarray\n")
+
+   offset = 0
+   for i_block in blocks:
+       points_func.compute_points(i_block)
+       b_points = i_block.npoints()
+       offset += b_points
+       lpos = np.array( i_block.functions_local_to_global() )
+       
+       if len(lpos) == 0:
+           continue
+           
+       # Extract the subset of the Phi matrix. 
+       phi = np.array(points_func.basis_values()["PHI"])[:b_points, :lpos.shape[0]]
+       # Extract the subset of Ca as well
+       Ca_local = Ca_np[(lpos[:, None], lpos)]
+       # Store in the correct spot
+       orbitals_p[lpos, offset - b_points : offset] = Ca_local.T @ phi.T
+
+   print(orbitals_p.shape)
    if module:
-       MOnp = np.abs(MOnp)
+       MOnp = np.abs(orbitals_p)
    if dens:
-     rho = np.einsum('pm->p',np.square(MOnp))
-
+     rho = np.einsum('pm->m',np.square(orbitals_p))
+   MOnp = orbitals_p
    if (not dens):  
       for m in orblist:
          fo =open(path+tag+"_"+str(m)+".cube","w")
@@ -150,14 +216,14 @@ def orbtocube(mol,L,D,Ca,orblist,basis,tag="tno+",path="./",dens=False,module=Fa
          fo.write("\n")
          fo.write("\n")
          fo.write("     %i %.6f %.6f %.6f\n" % ( mol.natom(),O[0],O[1],O[2]))
-         fo.write("   %i  %.6f %.6f %.6f\n" % (nx, D[0],0.0,0.0))
-         fo.write("   %i  %.6f %.6f %.6f\n" % (ny, 0.0,D[1],0.0))
-         fo.write("   %i  %.6f %.6f %.6f\n" % (nz, 0.0,0.0,D[2]))
+         fo.write("   %i  %.6f %.6f %.6f\n" % (nx, Dx[0],0.0,0.0))
+         fo.write("   %i  %.6f %.6f %.6f\n" % (ny, 0.0,Dx[1],0.0))
+         fo.write("   %i  %.6f %.6f %.6f\n" % (nz, 0.0,0.0,Dx[2]))
          for A in range(mol.natom()):
              fo.write("  %i %.6f %.6f %.6f %.6f\n" %(mol.charge(A), 0.0000, mol.x(A),mol.y(A),mol.z(A)))
          
          for i in range(ntot):
-             fo.write("%.5e\n" % MOnp[i,m-1])
+             fo.write("%.5e\n" % MOnp[m-1,i])
          fo.close
    else:
 
@@ -166,9 +232,9 @@ def orbtocube(mol,L,D,Ca,orblist,basis,tag="tno+",path="./",dens=False,module=Fa
       fo.write("\n")
       fo.write("\n")
       fo.write("     %i %.6f %.6f %.6f\n" % ( mol.natom(),O[0],O[1],O[2]))
-      fo.write("   %i  %.6f %.6f %.6f\n" % (nx, D[0],0.0,0.0))
-      fo.write("   %i  %.6f %.6f %.6f\n" % (ny, 0.0,D[1],0.0))
-      fo.write("   %i  %.6f %.6f %.6f\n" % (nz, 0.0,0.0,D[2]))
+      fo.write("   %i  %.6f %.6f %.6f\n" % (nx, Dx[0],0.0,0.0))
+      fo.write("   %i  %.6f %.6f %.6f\n" % (ny, 0.0,Dx[1],0.0))
+      fo.write("   %i  %.6f %.6f %.6f\n" % (nz, 0.0,0.0,Dx[2]))
       for A in range(mol.natom()):
           fo.write("  %i %.6f %.6f %.6f %.6f\n" %(mol.charge(A), 0.0000, mol.x(A),mol.y(A),mol.z(A)))
       for i in range(ntot):
@@ -331,9 +397,9 @@ def setgridcube(mol,basis_set,L=[4.0,4.0,4.0],D=[0.2,0.2,0.2]):
    ws = psi4.core.Vector.from_array(w)
 
    return xs,ys,zs,ws,N,O
-def denstocube(mol,basis,Dens,S,ndocc,tag,L,D=[0.2,0.2,0.2]):
+def denstocube(mol,basis,dmat,tag,Lx,Dx=[0.2,0.2,0.2]):
    
-    O,N=cubedata(mol,L,D)
+    O,N=cubedata(mol,Lx,Dx)
     
     
     nx = N[0]+1
@@ -341,24 +407,21 @@ def denstocube(mol,basis,Dens,S,ndocc,tag,L,D=[0.2,0.2,0.2]):
     nz = N[2]+1
     
     ntot= nx*ny*nz
-    x=np.zeros(ntot)
-    y=np.zeros(ntot)
-    z=np.zeros(ntot)
-    w=np.ones(ntot)
+    
     #aux variables
     x_ax=np.zeros(nx)
     y_ax=np.zeros(ny)
     z_ax=np.zeros(nz)
     grid = []
     for i in range(nx):
-        x_ax[i] = O[0]+D[0]*i
+        x_ax[i] = O[0]+Dx[0]*i
     
     for i in range(ny):
-        y_ax[i] = O[1]+D[1]*i
+        y_ax[i] = O[1]+Dx[1]*i
    
     
     for i in range(nz):
-        z_ax[i] = O[2]+D[2]*i
+        z_ax[i] = O[2]+Dx[2]*i
     
     
     for i in range(nx):
@@ -368,36 +431,59 @@ def denstocube(mol,basis,Dens,S,ndocc,tag,L,D=[0.2,0.2,0.2]):
                 grid.append(tmp)
     
     res = np.array(grid)
-    xs = psi4.core.Vector.from_array(res[:,0])
-    ys = psi4.core.Vector.from_array(res[:,1])
-    zs = psi4.core.Vector.from_array(res[:,2])
-    ws = psi4.core.Vector.from_array(w)
     
-    phi,lpos,nbas=phi_builder(mol,xs,ys,zs,ws,basis,'CUBE')
+    grid = np.array(grid).T
+ 
+     
+    points_func, blocks, npoints = get_block_points(grid,basis,target='CUBE')
+    density_p = np.zeros( npoints ) 
     
+    #print("n points: %i\n" % npoints)
+    # And proceed just like we did with the LDA kernet tutorial. 
+ 
+    points_func.set_pointers( psi4.core.Matrix.from_array(dmat) )
+    if not isinstance(dmat,np.ndarray):
+        raise TypeError("dmat must be np.ndarray\n")
+ 
+    offset = 0
+    for i_block in blocks:
+        points_func.compute_points(i_block)
+        b_points = i_block.npoints()
+        offset += b_points
+        lpos = np.array( i_block.functions_local_to_global() )
+        
+        if len(lpos) == 0:
+            continue
+            
+        # Extract the subset of the Phi matrix. 
+        phi = np.array(points_func.basis_values()["PHI"])[:b_points, :lpos.shape[0]]
+        # Extract the subset of Ca as well
+        Da_local = dmat[(lpos[:, None], lpos)]
+        # Store in the correct spot
+        density_p[offset - b_points : offset] = np.einsum('pm,mn,pn->p', phi, Da_local, phi, optimize=True)
+ 
     
-    temp = np.matmul(S,np.matmul(Dens.real,S))
+    """ 
+    temp = np.matmul(ovap,,np.matmul(Dens.real,S))
     try: 
        eigvals,eigvecs=scipy.linalg.eigh(temp,S,eigvals_only=False)
     except scipy.linalg.LinAlgError:
         print("Error in scipy.linalg.eigh of inputted matrix")
         return None 
     Rocc = eigvecs[:,-ndocc:]
-    MO = np.matmul(phi,Rocc)
-    MOs = np.square(MO)
-    rho = np.einsum('pm->p',MOs)
+    """
     fo =open(tag+".cube","w")
     ### write cube header
     fo.write("\n")
     fo.write("\n")
     fo.write("     %i %.6f %.6f %.6f\n" % ( mol.natom(),O[0],O[1],O[2]))
-    fo.write("   %i  %.6f %.6f %.6f\n" % (nx, D[0],0.0,0.0))
-    fo.write("   %i  %.6f %.6f %.6f\n" % (ny, 0.0,D[1],0.0))
-    fo.write("   %i  %.6f %.6f %.6f\n" % (nz, 0.0,0.0,D[2]))
+    fo.write("   %i  %.6f %.6f %.6f\n" % (nx, Dx[0],0.0,0.0))
+    fo.write("   %i  %.6f %.6f %.6f\n" % (ny, 0.0,Dx[1],0.0))
+    fo.write("   %i  %.6f %.6f %.6f\n" % (nz, 0.0,0.0,Dx[2]))
     for A in range(mol.natom()):
         fo.write("  %i %.6f %.6f %.6f %.6f\n" %(mol.charge(A), 0.0000, mol.x(A),mol.y(A),mol.z(A)))
     for i in range(ntot):
-        fo.write("%.5e\n" % (2.0*rho[i]))
+        fo.write("%.5e\n" % density_p[i])
     fo.close
 
 def esptocube(xs,ys,zs,wfnobj,mol,O,N,D=[0.2,0.2,0.2]):
@@ -424,5 +510,5 @@ def esptocube(xs,ys,zs,wfnobj,mol,O,N,D=[0.2,0.2,0.2]):
         psi4_matrix = psi4.core.Matrix.from_array(points)
         esp = np.array(myepc.compute_esp_over_grid_in_memory(psi4_matrix))
 
-        fo.write("%.5e\n" % (2.0*rho[i]))
+        fo.write("%.5e\n" % (esp[i]))
     fo.close
