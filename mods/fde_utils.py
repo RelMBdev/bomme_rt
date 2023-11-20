@@ -161,7 +161,7 @@ class emb_wrapper():
        grid = self.__embfactory.get_grid() # locally defined 
        
        if (pyembopt.debug):
-          np.savetxt ("grid.txt", grid)
+          np.savetxt (pyembopt.gridfname+".dump", grid)
        self.__grid = grid
        
        #init the GridFuncFactory for the active system, i.e to transform all the relevant quantities in the active system basis set representation.

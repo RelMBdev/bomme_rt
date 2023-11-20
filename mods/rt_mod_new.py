@@ -202,8 +202,10 @@ def run_rt_iterations(iter_opts, field_opts, bset, bsetH, wfn_bo, embmol, direct
     # in an orthonormal basis Dtilde should be diagonal with oo=1, vv=0
     ODtilde=np.matmul(C_inv,np.matmul(Dtilde,C_inv.T))
     Dp_ti = rt_prop.get_Dmat()   # the density matrix (t=-inf) in the basis of MOs (diagonal : [1]_occ , [0]_virt)
-    print("D[BO] is diagonal in the orbital basis: %s" % np.allclose(Dp_ti,ODtilde,atol=1.0e-14))
-
+    if debug:
+       print("D[BO] is diagonal in the orbital basis (tol=1.0e-14): %s" % np.allclose(Dp_ti,ODtilde,atol=1.0e-14))
+       diff_test = ODtilde - Dp_ti
+       print("max diff |ODtilde - Dtilde| : %.5e\n" % np.max(np.abs(diff_test)) )
 
     #nuclear dipole for non-homonuclear molecules
     Ndip= embmol.nuclear_dipole()

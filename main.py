@@ -13,6 +13,7 @@ from scf_run import run
 from init_run import initialize
 from fde_utils import embedoption
 import argparse
+import cube_util
 import rtutil
 ####################################################################################
 
@@ -68,6 +69,8 @@ if __name__ == "__main__":
     parser.add_argument("--select", help="Specify the occ-virt MO weighted dipole moment. (-2; occ_list & virt_list).\
                          Occ/virt_list is a list of numbers separated by semicolon. To include all the virtual mainfold\
                           set virt_list=-99 (default: "")",default="", type=str)
+    parser.add_argument("--print_cube", help="Print the selected MOs", required=False,
+                       default=False, action="store_true")
 
     parser.add_argument("--selective_pert", help="Selective perturbation on", required=False,
                        default=False, action="store_true")
@@ -161,6 +164,31 @@ if __name__ == "__main__":
 
 
     res, wfnBO = run(jkbase,psi4mol,bset,bsetH,args.guess,args.func1,args.func2,args.exmodel,wfn,pyembopt)
+
+    if args.print_cube:
+       print("    *******************************************************")
+       print("    * CUBE PRINT                                           ")
+       print("    * Orbitals : %s                                        "\
+                               % args.select.replace('-2;' , ''))
+       print("    *                                                      ")
+       print("    *******************************************************\n")
+       # set list for cube printing
+       if args.select != "":
+          molist = args.select.split("&")
+          occlist = molist[0].split(";")
+          occlist = [int(m) for m in occlist]
+          if occlist[0] < 0 :
+              occlist.pop(0)
+          virtlist = molist[1].split(";")
+          virtlist = [int(m) for m in virtlist]
+       Umat = wfnBO["Umat"]
+       Ccoeff = wfnBO["Ccoeff"]
+       tmp=np.matmul(Umat,Ccoeff)
+       #set margin and step
+       margin = [4.5,4.5,4.5]
+       dstep =  [0.2,0.2,0.2] 
+       cube_util.orbtocube(psi4mol,margin,dstep,tmp,occlist,bset,tag="PsiA_occ",path="./")
+       cube_util.orbtocube(psi4mol,margin,dstep,tmp,virtlist,bset,tag="PsiA_virt",path="./")
 
     if args.local_basis and (not args.real_time):
         from rlmo import regional_localize_MO    
