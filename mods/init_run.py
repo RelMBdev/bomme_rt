@@ -34,15 +34,13 @@ class checkpoint_data:
         return res
 
 
-def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
-                charge,numpy_memory=8,eri=None,rt_HF_iexch=False, exch_model=0, debug=False, restart=False, restart_json = None):
+def initialize(jkflag,scf_type,obs1,frag_spec,fgeom,func1,func2,\
+                numpy_memory=8,eri=None,rt_HF_iexch=False, exch_model=0, debug=False, restart=False, restart_json = None):
     # rt_HF_iexch flag determines if the imaginary part of the exchange 
     # is accounted in the rt-evolution
     # scf_type controls the type of scf type in the initialization (the GS density
     # is optionally used as guess density) and the type of J (K) matrix ('direct',
     # 'mem_df', 'disk_df', 'pk' integrals)
-    acc_bset = obs1
-    gen_bset = obs2
     
 
     #orblist = molist.split(";")
@@ -53,82 +51,79 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
     func_h=func1
     print("High Level functional : %s\n" % func_h)
     print("Low Level functional : %s\n" % func_l)
-    print("Low Level basis : %s\n" % gen_bset)
-    print("High Level basis : %s\n" % acc_bset)
     
     # corestr is a string containing only the 'high-level-theory' subsys
-    speclist, geomstr, corestr, natom_bomme = gparser(fgeom)    # natom_bomme is the number of atom of the bomme-fragment (in a bomme+FDE setup)
+    parsed_geom, f_id = gparser(frag_spec,fgeom)    # natom_bomme is the number of atom of the bomme-fragment (in a bomme+FDE setup)
+    #psi4 molecule object
+    molobj = psi4.geometry(parsed_geom.geometry())
+
+    print("number of fragmemts: %i\n" % molobj.nfragments())
+    molobj.activate_all_fragments()
     
-    # dump tmp file
-    with open("tmp.xyz","w") as fgeom_act:
-        fgeom_act.write("%s\n" %  str(natom_bomme) )
-        fgeom_act.write('\n') # black line       
-        tmp = (geomstr.split('\n'))[:natom_bomme]
-        for line in tmp:
-         
-         unlabeled = line.split()[0].replace('1','') + '   ' + line.split()[1] + '   ' + line.split()[2] + '   ' + line.split()[3]+ '\n'
-         fgeom_act.write(unlabeled)
-         
-    moltot = Molecule()
-    moltot.set_charge(charge)
-    moltot.geom_from_string(geomstr)
+    # parse the basis string
+    basis_sub_str = obs1.split(";")
+    basis_str = "assign " + str(basis_sub_str[0])+"\n"
 
-    psi4.set_memory('2 GB')
-
-    #iso_mol = psi4.geometry(molA.geometry())
-    #repene_iso = iso_mol.nuclear_repulsion_energy()
-    #psi4.core.clean()
-    # nuclear repulsione energy of subsys A
-
-
-    #append some options, we can also include total charge (q) and multiplicity (S) of the total system
-    moltot.append("symmetry c1" + "\n" + "no_reorient" + "\n" + "no_com")
-    moltot.display_xyz()
-    
-    # used in fragment A basis definition, see below
-    molA = Molecule()
-    molA.geom_from_string(corestr)
-    
-    #molA.display_xyz()
-    #molB.display_xyz()
-
-    molobj=psi4.geometry(moltot.geometry())
-    molobj.print_out()
-
-
-    psi4.core.IO.set_default_namespace("molobj")
-    def basisspec_psi4_yo__anonymous775(mol,role):
-            mol.set_basis_all_atoms(gen_bset, role=role)
-            for k in speclist:
-              mol.set_basis_by_label(k, acc_bset,role=role)
-            return {}
-
-
-    #the basis set object for the complex: a composite basis set for rt applications
-    psi4.qcdb.libmintsbasisset.basishorde['USERDEFINED'] = basisspec_psi4_yo__anonymous775
-
-    L=[4.5,4.5,4.5]
-    Dx=[0.15,0.15,0.15]
+    if len(basis_sub_str) >1:
+       for elm in basis_sub_str[1:]:
+           tmp= elm.split(":")
+           basis_str += "assign " + str(tmp[0]) + " " +str(tmp[1]) +"\n"
+    # set psi4 option
 
     psi4.core.set_output_file('psi4.out', False)
-    psi4.set_options({'basis': 'userdefined',
+    psi4.set_options({
                       'puream': 'True',
                       'DF_SCF_GUESS': 'False',
                       'scf_type': scf_type,
+                     # 'reference' : reference,
+                      'df_basis_scf': 'def2-universal-jkfit',
+                      'df_ints_io' : 'save',       # ?
                       'dft_radial_scheme' : 'becke',
-                      #'dft_radial_points': 49,
+                       #'dft_radial_points': 80,
                       'dft_spherical_points' : 434,
-                      'cubeprop_tasks': ['orbitals'],
-                      'cubeprop_orbitals': [1, 2, 3, 4,5,6,7,8,9,10],
-                      'CUBIC_GRID_OVERAGE' : L,
-                      'CUBEPROP_ISOCONTOUR_THRESHOLD' : 1.0,
-                      'CUBIC_GRID_SPACING' : Dx,
-                      'e_convergence': 1e-8,
-                      'd_convergence': 1e-8})
+                      'cubeprop_tasks': ['density'],
+                      'e_convergence': 1.0e-8,
+                      'd_convergence': 1.0e-8})
+
+    psi4.basis_helper(basis_str,
+                     name='mybas')
+
 
     job_nthreads = int(os.getenv('OMP_NUM_THREADS', 1))
     psi4.set_num_threads(job_nthreads)
 
+    
+    #get the basis set corresponding to total molecule
+    
+    bset = psi4.core.BasisSet.build(molobj, 'ORBITAL',\
+            psi4.core.get_global_option('basis')) # or set the basis from input
+
+    print("functions in general basis: %i" % bset.nbf())
+    #save the geometry with cleaned up symbols for later use
+    natom = molobj.nallatom()
+    geomstr = molobj.save_string_xyz()
+    with open("tmp.xyz","w") as fgeom_act:
+            fgeom_act.write("%s\n" %  str(natom) )
+            fgeom_act.write(geomstr)
+    
+    # get the reduced basis
+    molobj.deactivate_all_fragments()
+    molobj.set_active_fragments( [int(x) for x in range(1,len(f_id)+1)] )
+    bsetH = psi4.core.BasisSet.build(molobj, 'ORBITAL',\
+            psi4.core.get_global_option('basis')) # or set the basis from input
+
+    # reactivate all fragments
+    
+    molobj.activate_all_fragments()
+    molobj.update_geometry()
+
+    #bsetH.print_detail_out()
+    nbfA = bsetH.nbf()
+    # the n of basis function of the blended basis
+    numbas = bset.nbf()
+    
+    print("functions in subsys1: %i" % nbfA)
+    
     #mol_wfn = psi4.core.Wavefunction.build( \
     #                    embmol,psi4.core.get_global_option('basis'))
     #mol_wfn.basisset().print_detail_out()
@@ -136,7 +131,7 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
        ene,wfn=psi4.energy(func_l ,return_wfn=True)
     else:
        #build dummy wfn just to refresh mints & co 
-       wfn = psi4.core.Wavefunction.build(mol, psi4.core.get_global_option('BASIS')) 
+       wfn = psi4.core.Wavefunction.build(molobj, psi4.core.get_global_option('BASIS')) 
     #check if the low-level functional is hybrid/lrc/need HF exch
     checkdata = checkpoint_data(wfn, func_h, func_l, restart, json_data = restart_json)
     
@@ -148,35 +143,6 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
          print("The low-level-theory functional requires HF exch")
         else:
          fun_low_hfexch = False
-    # mHigh is the portion of the system treated at the higher level
-
-    mHigh=psi4.geometry(molA.geometry() +"symmetry c1" +"\n" +"no_reorient" +"\n" +"no_com")
-    #wfnA = psi4.core.Wavefunction.build( \
-    #                    mHigh,acc_bset)
-    #nelA=wfnA.nalpha()+wfnA.nbeta()
-    #print("Frag. A el: %i" %nelA)
-    #print()
-    print("centers of high level subsys: %i" % mHigh.natom())
-
-
-    bset=wfn.basisset()
-    numshell=bset.nshell()
-    print("Number of shells of the total AB basis:  %i" % numshell)
-    numbas=bset.nbf()
-    print("Number of functions of the total AB basis:  %i" % numbas)
-    #natoms=molobj.natom()
-    #the basis set object for the high level portion
-    bsetH=psi4.core.BasisSet.build(mHigh,'ORBITAL',acc_bset,puream=-1)
-
-    #bsetH.print_detail_out()
-    nbfA = bsetH.nbf()
-    
-    #nbfA = 0
-    #for k in range(numbas):
-    #    if bset.function_to_center(k) <= molA.natom()-1 :
-    #      nbfA+=1
-    
-    print("functions in subsys1: %i" % nbfA)
 
     mints = psi4.core.MintsHelper(bset)
     if (eri != 'fit') and (rt_HF_iexch) and (not fun_low_hfexch) and (not jkflag):
@@ -254,7 +220,7 @@ def initialize(jkflag,scf_type,obs1,obs2,fgeom,func1,func2,\
     from Fock_helper import jkfactory
     jkbase = jkfactory(bset,molobj,jkflag,scf_type,eri=eri_tensor,real_time=rt_HF_iexch,debug=debug)
 
-    return bset,bsetH, moltot,molobj,wfn,jkbase
+    return bset,bsetH, parsed_geom, molobj, wfn, jkbase
 
 ####################################################################################
 
@@ -267,6 +233,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-gA","--geomA", help="Specify geometry file for the subsystem A", required=True,    
             type=str, default="XYZ")
+    parser.add_argument("--frag_spec", help="Specify the fragment id (separated by semicolon) to be included in the high level portion", required=False, 
+            type=str, default="1")
     #parser.add_argument("-gB","--geomB", help="Specify geometry file for the subsystem B", required=True, 
     #        type=str, default="XYZ")
     parser.add_argument("-d", "--debug", help="Debug on, prints debug info to err.txt", required=False,
@@ -276,8 +244,10 @@ if __name__ == "__main__":
             type=str, default='GS',)
     parser.add_argument("-o1","--obs1", help="Specify the orbital basis set for subsys A", required=False, 
             type=str, default="6-31G*")
-    parser.add_argument("-o2","--obs2", help="Specify the general orbital basis set", required=False, 
-            type=str, default="6-31G*")
+
+    #parser.add_argument("-o2","--obs2", help="Specify the general orbital basis set", required=False, 
+    #        type=str, default="6-31G*")
+    
     parser.add_argument("-f2","--func2", help="Specify the low level theory functional", required=False, 
             type=str, default="blyp")
     parser.add_argument("-f1","--func1", help="Specify the high level theory functional", required=False, 
@@ -289,10 +259,10 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--numpy_mem", help="Set the memeory for the PSI4 driver (default 2 Gib)", required=False,
             default=2, type = int)
 
-    parser.add_argument("-z", "--charge", help="Charge of the whole system",
-            default=0, type = int)
+    #parser.add_argument("-z", "--charge", help="Charge of the whole system",
+    #        default=0, type = int)
     args = parser.parse_args()
 
     
-    bset,bsetH,moltot,psi4mol,wfn, jkbase = initialize(args.jkclass,args.scf_type,args.obs1,args.obs2,args.geomA,\
-                   args.func1,args.func2,args.charge)
+    bset,bsetH,moltot,psi4mol,wfn, jkbase = initialize(args.jkclass,args.scf_type,args.obs1,args.frag_spec,args.geomA,\
+                   args.func1,args.func2)

@@ -320,7 +320,7 @@ if __name__ == "__main__":
     import psi4
     from molecule import Molecule
     mol_act = Molecule(args.geom_act)
-
+    mol_act.finalize()
     psi4.core.set_output_file('psi.out', False)
     
     molobj=psi4.geometry(mol_act.geometry())

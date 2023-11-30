@@ -183,18 +183,19 @@ def run(jkclass,embmol,bset,bsetH,guess,func_high,func_low,exmodel,wfn,pyembopt=
     P=np.matmul(S11_inv,S12)
     U[:nbfA,nbfA:]=-1.0*P
     
-    if numbas == nbfA: # the entire system is set as "core"
-      print("U is the identity operator : %s\n" % np.allclose(U,np.eye(nbfA)))
     #S block orthogonal
     Stilde= np.matmul(U.T,np.matmul(S,U))
     np.savetxt("ovap.txt",S)
     np.savetxt("ovapBO.txt", Stilde)
 
-    #check S in the BO basis: the S^AA block should be the same as S (in AO basis)
-    print("Overlap_AA in BO is Overlap_AA in AO: %s" %(np.allclose(Stilde[:nbfA,:nbfA],S[:nbfA,:nbfA])))
-    #check the off diag block of Stilde
-    mtest=np.zeros((nbfA,(numbas-nbfA)))
-    print("Overlap_AB in BO is zero: %s" %(np.allclose(Stilde[:nbfA,nbfA:],mtest)))
+    if numbas == nbfA: # the entire system is set as "core"
+      print("U is the identity operator : %s\n" % np.allclose(U,np.eye(nbfA)))
+    else:
+      #check S in the BO basis: the S^AA block should be the same as S (in AO basis)
+      print("Overlap_AA in BO is Overlap_AA in AO: %s" %(np.allclose(Stilde[:nbfA,:nbfA],S[:nbfA,:nbfA])))
+      #check the off diag block of Stilde
+      mtest=np.zeros((nbfA,(numbas-nbfA)))
+      print("Overlap_AB in BO is zero: %s" %(np.allclose(Stilde[:nbfA,nbfA:],mtest)))
 
     #CHECK
     print("using EX model: ......... %i\n" % exmodel)
@@ -358,7 +359,7 @@ def run(jkclass,embmol,bset,bsetH,guess,func_high,func_low,exmodel,wfn,pyembopt=
     
     Bo_scf = scf_run(data_scf,fock_help,bsetH,maxiter,E_conv,D_conv,embobj=embed,opt=pyembopt)
     print('\nStart SCF iterations:\n\n')
-    t = time.time()
+    t = time.process_time()
     Cocc,Dtilde,Ftilde,SCF_E = Bo_scf()
     eigvals = Bo_scf.epsilon()
     C = Bo_scf.C()
@@ -407,7 +408,7 @@ def run(jkclass,embmol,bset,bsetH,guess,func_high,func_low,exmodel,wfn,pyembopt=
             psi4.clean()
             raise Exception("Maximum number of SCF cycles exceeded.\n")
     """
-    print('Total time for SCF iterations: %.3f seconds \n\n' % (time.time() - t))
+    print('Total time for SCF iterations: %.3f seconds \n\n' % (time.process_time() - t))
 
     print('Final scf BO energy: %.8f hartree\n' % SCF_E)
 

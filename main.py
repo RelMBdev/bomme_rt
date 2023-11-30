@@ -32,10 +32,14 @@ if __name__ == "__main__":
 
     parser.add_argument("--guess", help="Set the guess density ('SAD' or 'GS')", required=False,
             type=str, default='GS',)
-    parser.add_argument("-o1","--obs1", help="Specify the orbital basis set for subsys A", required=False, 
+    parser.add_argument("-o1","--obs1", help="Specify the orbital basis set (genbasis;El1:basis1;El2:basis2)", required=False, 
             type=str, default="6-31G*")
-    parser.add_argument("-o2","--obs2", help="Specify the general orbital basis set", required=False, 
-            type=str, default="6-31G*")
+    parser.add_argument("--frag_spec", help="Specify the fragment id (separated by semicolon) to be included in the high level portion", required=False, 
+            type=str, default="1")
+
+    #parser.add_argument("-o2","--obs2", help="Specify the general orbital basis set", required=False, 
+    #        type=str, default="6-31G*")
+    
     parser.add_argument("-f2","--func2", help="Specify the low level theory functional", required=False, 
             type=str, default="blyp")
     parser.add_argument("-f1","--func1", help="Specify the high level theory functional", required=False, 
@@ -159,8 +163,8 @@ if __name__ == "__main__":
       pyembopt.param = tuple(gparam)
 
     # call functions here    
-    bset,bsetH, molelecule_str, psi4mol, wfn, jkbase = initialize(args.jkclass,args.scf_type,args.obs1,args.obs2,args.geomA,\
-                   args.func1,args.func2,args.charge,args.numpy_mem,args.eri,args.rt_HF_iexch,args.exmodel,args.debug)
+    bset,bsetH, molelecule_str, psi4mol, wfn, jkbase = initialize(args.jkclass,args.scf_type,args.obs1,args.frag_spec,args.geomA,\
+                   args.func1,args.func2,args.numpy_mem,args.eri,args.rt_HF_iexch,args.exmodel,args.debug)
 
 
     res, wfnBO = run(jkbase,psi4mol,bset,bsetH,args.guess,args.func1,args.func2,args.exmodel,wfn,pyembopt)
@@ -224,6 +228,8 @@ if __name__ == "__main__":
        print("Startig real-time tddft computation")
        print()
        # call rt using the four indices I tensor (for small systems due to memory requirements)
+       import time
+       rt_time = time.process_time()
        rt_mod_new.run_rt_iterations(iter_opts, field_opts, bset, bsetH, wfnBO, psi4mol, args.axis, args.select, args.selective_pert, args.local_basis,\
                args.exciteA_only, args.numpy_mem, args.debug,pyembopt, args.use_cap)
-         
+       print('Total time of rt_module: %.3f seconds \n\n' % (time.process_time() - rt_time))
