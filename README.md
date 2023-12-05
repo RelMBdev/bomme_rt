@@ -20,36 +20,48 @@ see exportvar.sh
 
 For an fde/bommme calculation 
 
-python3.9 ~/bomme_rt/main.py -d -gA H2O.xyz -gB NH3.xyz -f1 blyp -f2 blyp -o1 aug-cc-pvdz -o2 aug-cc-pvdz -z 0 -J --env_obs AUG/ADZP  
+python3.9 ~/bomme_rt/main.py -d -gA H2O.xyz -gB NH3.xyz -f1 blyp -f2 blyp -o1 "general_basis;O1:basisO1;H1:basisH1" -z 0 -J --env_obs AUG/ADZP  
 --env_func blyp --jobtype adf --grid_opts 2  --grid_param "4.0"  --embthresh  1.0e-8 --fde_max 10 --fde  --real_time --rt_HF_iexch --eri nofit > res.out
 
--gA : geometry file for the bomme ("core") subsystem. The Bomme subsystem can be partioned in two domains: the high-level theory and low-level theory (defining their associated functionals/basis sets)
+-gA : geometry file for the bomme ("core") subsystem. The Bomme subsystem can be partitioned into two domains: the high-level theory and low-level theory (defining their associated functionals/basis sets)
 
--f1 functional defining the high-level theory domain 
--f2 functional defining the low-level theory domain 
--o1 high-level theory domain basis set
--o2 low-level theory domain basis set
+-f1 functional defining the high-level theory domain
 
--gB : geometry file of the FDE environment
+-f2 functional defining the low-level theory domain
+
+-o1 basis set string: first define the general (low level) basis, and specify the basis by elements (by labels using semicolon)
+
+Note: the atomic symbols in the high-level fragment are automatically labeled, i.e Symb ->Symb1)
+
+-gB: geometry file of the FDE environment
+
 --env_obs Psi4/ADF basis set for the FDE fragment
+
 --env_func functional for the frozen density calculation
 
 bomme geometry file looks like:
-3                                            @  <- total nunber of atoms in the "bomme" molecule                            
-#comment line                                @
-O     1.568501    0.105892    0.000005       @ ]  high-level theory domain
-H     0.606736   -0.033962   -0.000628       @ ] 
--frag-                                       @  <- separator
-H     1.940519   -0.780005    0.000222       @ ]  low-level theory domain
 
-fde geometry file:
+|    |         |         |         |                       |
+| -- |:-------:|:-------:|:-------:|:----------------------|
+| 3  |         |         |         | #total number of atoms|
+|    |         |         |         | #blanck line           |
+|-1 1|         |         |         |# charge & multplicity |
+| O  | 1.56850 | 0.105892| 0.000005|# frag 1 (high level)  |
+| H  | 0.606736|-0.033962|-0.000628|# frag 1 (high level)  | 
+| -- |         |         |         |#Psi4-style separator   |
+| 1 1|         |         |         |# charge & multplicity |
+| H  | 1.940519|-0.780005| 0.000222|# frag 2 (low level)   |
 
- 4
-NH3
- N    -1.395591   -0.021564    0.000037
- H    -1.629811    0.961096   -0.106224
- H    -1.862767   -0.512544   -0.755974
- H    -1.833547   -0.330770    0.862307 
+
+(fde) environemnt geometry file:
+|    |         |         |         |
+| -- |:-------:|:-------:|:-------:|
+|4   |
+|#   |
+| N  |-1.395591|-0.021564| 0.000037|
+| H  |-1.629811| 0.961096|-0.106224|
+| H  |-1.862767|-0.512544|-0.755974|
+| H  |-1.833547|-0.330770| 0.862307|
 
 Charge of the frozen density subsystem is derived from active system charge (z) and total charge (Z)
 
