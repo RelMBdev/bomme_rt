@@ -51,6 +51,7 @@ NH3
  H    -1.862767   -0.512544   -0.755974
  H    -1.833547   -0.330770    0.862307 
 
+Charge of the frozen density subsystem is derived from active system charge (z) and total charge (Z)
 
 To cite this code in all its parts, please refer to the following papers:
 

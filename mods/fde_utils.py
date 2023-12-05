@@ -50,6 +50,9 @@ class embedoption:
     drz: float = 0.1
     margin: float = 5.5
     gridfname : str = "grid.dat"
+    scf_type : str = 'direct'
+    df_guess : bool = False
+    df_basis : str = 'def2-universal-jkfit'
 
 import pyembmod
 from pyembmod import GridDensityFactory
@@ -137,7 +140,10 @@ class emb_wrapper():
        
        self.__embfactory = pyembmod.pyemb(activefname,envirofname,pyembopt.jobtype) #jobtype='adf' is default
        #grid_param =[50,110] # psi4 grid parameters (see Psi4 grid table), can be set using args.grid_param
-       
+
+       if pyembopt.jobtype == 'psi4':
+          self.__embfactory.set_psi4_extra(pyembopt.scf_type,pyembopt.df_guess,pyembopt.df_basis)
+ 
        self.__embfactory.set_charge(self.__active_charge) 
        self.__embfactory.set_charge(self.__tot_charge,'total') 
 

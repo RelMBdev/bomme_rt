@@ -12,6 +12,27 @@ if modpaths is not None :
 
 from molecule import Molecule, gparser
 
+def dump_geom(psimol,jobtype):
+    # dump a txt file containing basis geometry 
+    # (no charge/mult if jobtype == 'adf')  
+    natom = psimol.nallatom()
+    with open("tmp.xyz","w") as fgeom_act:
+      if jobtype == 'adf':
+         geom_mat = np.asarray(psimol.geometry())*0.52917720859
+         symb = [psimol.symbol(id_atom) for id_atom in range(natom)]
+         fgeom_act.write("%s\n" %  str(natom) )
+         fgeom_act.write("\n")
+         for k in range(natom):
+             fgeom_act.write("%s %.6f  %.6f  %.6f\n" % (symb[k],geom_mat[k,0],\
+                       geom_mat[k,1],geom_mat[k,2]))
+      else:
+          geomstr = psimol.save_string_xyz()
+          fgeom_act.write("%s\n" %  str(natom) )
+          fgeom_act.write("\n")
+          fgeom_act.write(geomstr)
+
+    fgeom_act.close()
+
 class checkpoint_data:
     def __init__(self,wfn,func_h = 'blyp',func_l = 'blyp',restart=False, json_data = None):
         self.__restart = restart
@@ -35,7 +56,7 @@ class checkpoint_data:
 
 
 def initialize(jkflag,scf_type,obs1,frag_spec,fgeom,func1,func2,\
-                numpy_memory=8,eri=None,rt_HF_iexch=False, exch_model=0, debug=False, restart=False, restart_json = None):
+                numpy_memory=8,eri=None,rt_HF_iexch=False, exch_model=0, debug=False, fdejob='adf' ,restart=False, restart_json = None):
     # rt_HF_iexch flag determines if the imaginary part of the exchange 
     # is accounted in the rt-evolution
     # scf_type controls the type of scf type in the initialization (the GS density
@@ -69,7 +90,7 @@ def initialize(jkflag,scf_type,obs1,frag_spec,fgeom,func1,func2,\
            tmp= elm.split(":")
            basis_str += "assign " + str(tmp[0]) + " " +str(tmp[1]) +"\n"
     # set psi4 option
-
+    psi4.set_memory(str(numpy_memory) + 'GB')
     psi4.core.set_output_file('psi4.out', False)
     psi4.set_options({
                       'puream': 'True',
@@ -99,12 +120,9 @@ def initialize(jkflag,scf_type,obs1,frag_spec,fgeom,func1,func2,\
             psi4.core.get_global_option('basis')) # or set the basis from input
 
     print("functions in general basis: %i" % bset.nbf())
+    
     #save the geometry with cleaned up symbols for later use
-    natom = molobj.nallatom()
-    geomstr = molobj.save_string_xyz()
-    with open("tmp.xyz","w") as fgeom_act:
-            fgeom_act.write("%s\n" %  str(natom) )
-            fgeom_act.write(geomstr)
+    dump_geom(molobj,fdejob) 
     
     # get the reduced basis
     molobj.deactivate_all_fragments()
@@ -253,11 +271,13 @@ if __name__ == "__main__":
     parser.add_argument("-f1","--func1", help="Specify the high level theory functional", required=False, 
             type=str, default="blyp")
     parser.add_argument("--scf_type", help="Specify the scf type: direct or df (for now)", required=False, 
-            type=str, default="direct")
+            type=str, default="DIRECT")
     parser.add_argument("-J", "--jkclass", help="Use JK class for J and K matrix computation", required=False,
             default=False, action="store_true")
     parser.add_argument("-m", "--numpy_mem", help="Set the memeory for the PSI4 driver (default 2 Gib)", required=False,
             default=2, type = int)
+    parser.add_argument("--jobtype", help="set the adf/psi4 embedding job (default = adf)",
+        required=False, type=str, default="adf")
 
     #parser.add_argument("-z", "--charge", help="Charge of the whole system",
     #        default=0, type = int)
@@ -265,4 +285,4 @@ if __name__ == "__main__":
 
     
     bset,bsetH,moltot,psi4mol,wfn, jkbase = initialize(args.jkclass,args.scf_type,args.obs1,args.frag_spec,args.geomA,\
-                   args.func1,args.func2)
+                   args.func1,args.func2,fdejob = args.jobtype)

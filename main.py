@@ -88,6 +88,13 @@ if __name__ == "__main__":
             default=False, action="store_true")
 
     # pyemboption goes here
+    parser.add_argument("--env_scf_type", help = "Set scf_type for psi4 run of environment density (default : direct)", required=False,
+            type=str, default="direct")
+    parser.add_argument("--env_df_guess", help = "Turn on density fitting to rapidly converge before switching \
+                to direct scf for enviroment (default: False)",required=False,
+            default=False, action="store_true")
+    parser.add_argument("--env_df_basis", help = "Set df basis for enviroment calculation (default : def2-universal-jkfit)",required=False,
+            type=str, default="def2-universal-jkfit")
     parser.add_argument("-gB","--geom_env", help="Specify frozen system (Angstrom) geometry (default: geomB.xyz)", required=False, 
             type=str, default="geomB.xyz")
     parser.add_argument("-Z", "--charge_tot", help="Charge of the FDE system [bomme(A)+ env(B)]",
@@ -151,6 +158,9 @@ if __name__ == "__main__":
     pyembopt.thresh_conv = args.embthresh
     pyembopt.basis = args.env_obs
     pyembopt.excfuncenv = args.env_func
+    pyembopt.scf_type = args.env_scf_type
+    pyembopt.df_basis = args.env_df_basis
+    pyembopt.df_guess = args.env_df_guess 
     
     gparam = args.grid_param.split(",")
     if args.jobtype == 'adf':
@@ -164,7 +174,7 @@ if __name__ == "__main__":
 
     # call functions here    
     bset,bsetH, molelecule_str, psi4mol, wfn, jkbase = initialize(args.jkclass,args.scf_type,args.obs1,args.frag_spec,args.geomA,\
-                   args.func1,args.func2,args.numpy_mem,args.eri,args.rt_HF_iexch,args.exmodel,args.debug)
+                   args.func1,args.func2,args.numpy_mem,args.eri,args.rt_HF_iexch,args.exmodel,args.debug,args.jobtype)
 
 
     res, wfnBO = run(jkbase,psi4mol,bset,bsetH,args.guess,args.func1,args.func2,args.exmodel,wfn,pyembopt)
