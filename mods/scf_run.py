@@ -321,7 +321,7 @@ def run(jkclass,embmol,bset,bsetH,guess,func_high,func_low,exmodel,wfn,pyembopt=
     #print(np.allclose(E_1el,Ebo_1el))
 
     # Cocc is in BO basis
-    if not pyembopt.nofde or pyembopt.static_field:
+    if not pyembopt.nofde or pyembopt.static_field or pyembopt.extern_flag:
     # initialize the embedding engine
        embed = fde_utils.emb_wrapper(embmol,pyembopt,bset)
        # here we need the active system density expressed on the grid

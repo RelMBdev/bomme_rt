@@ -336,24 +336,25 @@ class real_time():
         #                        C,S,imp_opts,U,func_h,bsetH,exA=False,maxit= 10 ,Vemb=None,fout=sys.stderr, debug=False)
         ##
         #if iterative embedding is required  feed fock_base with embedding potential here
-        if iterative:
+        if iterative and not nofde:
            if ( ( i_step % int(pyembopt.fde_offset/dt) ) == 0.0 ):
                #if self.__embopt.debug:
                #      print("i step %i, update Vemb\n" % i_step)
+
                # make new emb potential
                # transform from the progation basis to the atomic basis (either BO or AO)
                # further transform to the AO basis if Umat is not None
-               if not nofde: # it enforces the iterative condition, for an external static field the iterative procedure would be redundant
-                  # available matrices: C matrix (trasform a density matrix from orthonormal basis to non-orthonormal basis)
-                  #                     U matrix
-                  embfactory.set_density(None,self.__Dp,self.__ndocc,C,Umat=U) # set electron density on grid through the density matrix (here we use the density represented on the prop. basis,ovapm=Id)
-                  #if self.__embopt.debug:
-                     #check_el_number = embfactory.rho_integral()
-                     #print("rho-integral: %.8f\n" % check_el_number)
-                  Vemb = embfactory.make_embpot()
-                  fock_base.set_vemb(Vemb)
-               else:
-                  print("!! Iterative Vemb update is %s and nofde is %s\n" % (nofde,iterative))    
+
+               # [not nofde] condition enforces the iterative condition only for relevant cases, e.g for an external static field the iterative procedure would be redundant
+               # trasnformation matrices: C matrix (trasform a density matrix from orthonormal basis to non-orthonormal basis)
+               #                          U matrix
+               embfactory.set_density(None,self.__Dp,self.__ndocc,C,Umat=U) # set electron density on grid through the density matrix (here we use the density represented on the prop. basis,ovapm=Id)
+               #if self.__embopt.debug:
+                  #check_el_number = embfactory.rho_integral()
+                  #print("rho-integral: %.8f\n" % check_el_number)
+               Vemb = embfactory.make_embpot()
+               fock_base.set_vemb(Vemb)
+        
         ene_container,func_t,fock_mid, Dp_ti_dt = self.__onestep_prop()
        
         self.__field_t = func_t     # collect quantities

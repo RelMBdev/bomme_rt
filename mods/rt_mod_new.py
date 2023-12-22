@@ -109,7 +109,7 @@ def run_rt_iterations(iter_opts, field_opts, bset, bsetH, wfn_bo, embmol, direct
 
     fock_base = fock_factory(jkclass,Hcore,Stilde, \
                             funcname=func_l,basisobj=bset,exmodel=exmodel)
-    if (not pyembopt.nofde) or pyembopt.static_field:
+    if (not pyembopt.nofde) or pyembopt.static_field or pyembopt.extern_flag:
        
     # initialize the embedding engine
        embed = fde_utils.emb_wrapper(embmol,pyembopt,bset,ovap=np.array(mints.ao_overlap()))

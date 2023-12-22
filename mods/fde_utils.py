@@ -32,6 +32,7 @@ class embedoption:
     core_charge : int  # the core system is the bomme subsystem
     fde_offset: np.float64
     fde_thresh: np.float64 = 1.0e-6
+    extern_pot = None
     maxit_fde : int = 0
     inputfile: str = "input.inp"
     gtype: int = 2
@@ -41,6 +42,7 @@ class embedoption:
     basis: str = 'AUG/ADZP'
     excfuncenv : str = "BLYP"
     static_field : bool = False
+    extern_flag : bool = False
     fmax : np.float64 = 1.0e-5
     fdir: int = 2
     densityzero: str = ""
@@ -116,6 +118,7 @@ class GridFuncFactory(GridDensityFactory):
 class emb_wrapper():
     def __init__(self,mol_obj,pyembopt,basis_act,stdoutprint=True,ovap=None):
        self.__e_field = pyembopt.static_field # Bool
+       self.__ext_pot = pyembopt.extern_pot
        self.__fmax = pyembopt.fmax 
        self.__fdir = pyembopt.fdir
        self.__nofde = pyembopt.nofde
@@ -212,7 +215,9 @@ class emb_wrapper():
         if not self.__nofde:
            density=np.zeros((rho_on_grid.shape[0],10))
            density[:,0] = rho_on_grid
-           pot = self.__embfactory.get_potential(density) 
+           pot = self.__embfactory.get_potential(density)
+        elif isinstance(self.__ext_pot,np.ndarray):
+           pot = self.__ext_pot    
         else:
            pot = np.zeros_like(rho_on_grid) 
 
@@ -227,8 +232,8 @@ class emb_wrapper():
            totpot = pot 
         if self.__initpot is None:
             self.__initpot = totpot
-        if (self.__debug):
-            np.savetxt ("initialpot.txt", self.__initpot)
+            if (self.__debug):
+                np.savetxt ("initialpot.txt", self.__initpot)
         if not isinstance(totpot,np.ndarray):
            raise Exception("not a grid function")
         gridfunc = self.__gridfactory #previously initialized 

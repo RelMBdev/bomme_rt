@@ -127,6 +127,8 @@ if __name__ == "__main__":
             default=0.1, type = float)
     parser.add_argument("-i","--iterative", help="Set iterative update of the embedding potential", required=False,
             default=False, action="store_true")
+    parser.add_argument("--ext_fname", help="Specify external potential file", required=False,    
+            type=str, default=None)
     ### restart flag ## 
     parser.add_argument("--restart", help="restart from checkpoint", required=False,
             default=False, action="store_true")
@@ -171,6 +173,13 @@ if __name__ == "__main__":
     else:
       gparam = [int(m) for m in gparam]
       pyembopt.param = tuple(gparam)
+
+    if args.ext_fname  is not None:
+       ext_fname = args.ext_fname
+       if not os.path.isfile(ext_fname):
+           raise Exception("File ", ext_fname , " does not exist")
+       pyembopt.extern_pot = np.loadtxt(ext_fname)
+       pyembopt.extern_flag = True
 
     # call functions here    
     bset,bsetH, molelecule_str, psi4mol, wfn, jkbase = initialize(args.jkclass,args.scf_type,args.obs1,args.frag_spec,args.geomA,\
