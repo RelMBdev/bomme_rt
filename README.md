@@ -6,8 +6,12 @@ fronzen density, through the pyembed (class).
 
 
 **clone numericaltest branch from https://github.com/BERTHA-4c-DKS/pybertha**
-export COMMON_PATH=/home/matteo/bomme_rt/common
-export MODS_PATH=/home/matteo/bomme_rt/mods
+
+export BOMME_ROOT = "your_bomme_dir" 
+
+export COMMON_PATH=$BOMME_ROOT/common
+
+export MODS_PATH=$BOMME_ROOT/mods
 
 and
 
