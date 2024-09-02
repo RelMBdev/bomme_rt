@@ -27,14 +27,16 @@ import bo_helper
 from localizer import Localizer 
 import rtutil
 import fde_utils
+import cube_util
 ##################################################################
 
 # mo_select : string containing two substrings "-2; list_occ & list_vist"
 # selective_pert : bool.  Turn on selective perturbation. See Repisky M et al 2015
 # local_basis : bool . Use a localized basis instead of ground-state MOs
 # exA_only : excite only A subsystem; either using local_bas or selective_pert or numerical approach
+# cube_data is a data class that store the cube parameters and the dumping fruquency
 def run_rt_iterations(iter_opts, field_opts, bset, bsetH, wfn_bo, embmol, direction, mo_select, selective_pert, local_basis, exA_only,\
-                     numpy_mem,debug,pyembopt=None, capflag = False):
+                     numpy_mem,debug,pyembopt=None, capflag = False, cube_data=None):
     # TODO: the parameter of the propagation (e.g delta_t, n_iter are derivede locally) can be passed from outside
     numbas = wfn_bo['nbf_tot']
     nbf_A = wfn_bo['nbf_A']
@@ -137,6 +139,7 @@ def run_rt_iterations(iter_opts, field_opts, bset, bsetH, wfn_bo, embmol, direct
     dip_dict={'0' : 'x', '1' : 'y', '2' : 'z'}
     dip_dir.pop(direction)
     dipmat_list = []
+    numocc_list = []   # to collect the diagonal element of Dp_ti (MO)
     dipmat_list.append(dip_mat)
     # the list contains the dipole matrices in the order: the matrix of the dipole-component in the boost direction,
     # and the additional matrices corresponding to the perpendicular directions to the boost
@@ -223,6 +226,29 @@ def run_rt_iterations(iter_opts, field_opts, bset, bsetH, wfn_bo, embmol, direct
     #   func = svwn5_func
     #else:
     #   func=calc_params['func_type']
+    
+    ###
+    
+    #if ftden:
+    #    #tdmat = np.matmul(U,np.matmul((Dtilde-Dtilde),np.conjugate(U.T)))
+    #    tdmat = Dtilde-Dtilde
+    #    for n in  binlist:
+    #       td_container.append(tdmat * np.exp( -2.0j*np.pi*0*n/Ns))
+
+    ###
+    if cube_data.dump:
+      # O param and N param  control the cube   
+      ovap_AO = np.asarray(mints.ao_overlap())
+      os.mkdir("td.ground")
+      # legacy ?
+      #xp,yp,zp,wp,Nparam,Oparam = cube_util.setgridcube(embmol,cube_data.margin,cube_data.Dx)
+      #phi_mat,lpos,dummy=cube_util.phi_builder(embmol,xp,yp,zp,wp,bset)
+
+      cube_util.denstocube(embmol, bset, rt_prop.get_Dmat('AO'),\
+                                "density", cube_data.margin, cube_data.Dx)
+      
+      os.rename("density.cube","td.ground/density.cube")
+    ###
 
     print("analytic : %i" % analytic)
     if (analytic):
@@ -242,19 +268,6 @@ def run_rt_iterations(iter_opts, field_opts, bset, bsetH, wfn_bo, embmol, direct
     #for analysis
     dipmo_mat=np.matmul(np.conjugate(C.T),np.matmul(dip_mat,C))
 
-    ###
-    #if ftden:
-    #    #tdmat = np.matmul(U,np.matmul((Dtilde-Dtilde),np.conjugate(U.T)))
-    #    tdmat = Dtilde-Dtilde
-    #    for n in  binlist:
-    #       td_container.append(tdmat * np.exp( -2.0j*np.pi*0*n/Ns))
-    #if args.dump:
-    #  os.mkdir("td.0000000")
-    #  xs,ys,zs,ws,N,O = cube_util.setgridcube(mol,L,D)
-    #  phi,lpos,nbas=cube_util.phi_builder(mol,xs,ys,zs,ws,basis_set)
-    #  cube_util.denstocube(phi,Da,S,ndocc,mol,"density",O,N,D)
-    #  os.rename("density.cube","td.0000000/density.cube")
-    ###
     
     #weighted dipole setup orbital list
     if (do_weighted == -2) and isinstance(virtlist,list):
@@ -296,12 +309,13 @@ def run_rt_iterations(iter_opts, field_opts, bset, bsetH, wfn_bo, embmol, direct
         #      tmp+=tdmat * np.exp( -2.0j*np.pi*j*n/Ns)
         #      td_container[count]=tmp
         #      count+=1
-        #if args.dump:
-        #   if ( ( j % args.oint ) == 0 ) :
-        #      path="td."+str(j).zfill(7)
-        #      os.mkdir(path)
-        #      cube_util.denstocube(phi,D_ti,S,ndocc,mol,"density",O,N,D)
-        #      os.rename("density.cube",path+"/density.cube")
+        if cube_data.dump:
+           if ( ( j % cube_data.int_cdump ) == 0 ) :
+              path="td."+str(j).zfill(7)
+              os.mkdir(path)
+              cube_util.denstocube(embmol, bset, rt_prop.get_Dmat('AO'), "density",\
+                             cube_data.margin, cube_data.Dx)
+              os.rename("density.cube",path+"/density.cube")
 
         Ah=np.conjugate(rt_prop.get_midpoint_mtx().T)
         outfile.write('Fock_mid hermitian: %s\n' % np.allclose(rt_prop.get_midpoint_mtx(),Ah))
@@ -310,6 +324,8 @@ def run_rt_iterations(iter_opts, field_opts, bset, bsetH, wfn_bo, embmol, direct
         if debug:
           dipval = rt_prop.get_dipole()[0]
           outfile.write('Dipole  %.8f %.15f\n' % (j*dt, 2.00*dipval[j].real))
+        
+        numocc_list +=[np.diagonal(Dp_ti).real]
 
         if (do_weighted == -2):
           #weighted dipole 
@@ -347,7 +363,9 @@ def run_rt_iterations(iter_opts, field_opts, bset, bsetH, wfn_bo, embmol, direct
     if (do_weighted == -2):
       wd_dip=2.00*np.array(weighted_dip).real
       np.savetxt('weighteddip.txt', np.c_[t_point,wd_dip], fmt='%.12e')
-
+    # convert to np.array
+    numocc_list = np.array(numocc_list)
+    np.savetxt('occnum.txt', np.c_[t_point,numocc_list], fmt='%.5e')
     np.savetxt('dipole-'+2*dip_dict[str(direction)]+'.txt', np.c_[t_point,dip_t], fmt='%.12e')
     # dipole_ij, i denotes the ith component of dipole vector, j denote the direction of the field
     np.savetxt('dipole-'+dip_dict[str(dip_dir[0])]+dip_dict[str(direction)]+'.txt', np.c_[t_point,2.00*np.array(dip_perp0).real], fmt='%.12e')
