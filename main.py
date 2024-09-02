@@ -12,6 +12,7 @@ if modpaths is not None :
 from scf_run import run
 from init_run import initialize
 from fde_utils import embedoption
+from cube_util import cubeoption
 import argparse
 import cube_util
 import rtutil
@@ -86,6 +87,10 @@ if __name__ == "__main__":
             default=False, action="store_true")
     parser.add_argument("--fde", help="FDE on", required=False,
             default=False, action="store_true")
+    parser.add_argument("--rt_cdump", help="Dump cube of td density", required=False,
+            default=False, action="store_true")
+    parser.add_argument("--int_cdump", help="Set the interval of rt cube dumping", required=False,
+            type = int, default=1)
 
     # pyemboption goes here
     parser.add_argument("--env_scf_type", help = "Set scf_type for psi4 run of environment density (default : direct)", required=False,
@@ -188,6 +193,17 @@ if __name__ == "__main__":
 
     res, wfnBO = run(jkbase,psi4mol,bset,bsetH,args.guess,args.func1,args.func2,args.exmodel,wfn,pyembopt)
 
+    #set margin and step
+    margin = [4.5,4.5,4.5]
+    dstep =  [0.3,0.3,0.3] 
+
+    # set cube_data
+    cube_data = cubeoption
+    cubeoption.dump = args.rt_cdump
+    cubeoption.int_cdump = args.int_cdump
+    cubeoption.margin = margin
+    cubeoption.Dx = dstep
+
     if args.print_cube:
        print("    *******************************************************")
        print("    * CUBE PRINT                                           ")
@@ -207,9 +223,7 @@ if __name__ == "__main__":
        Umat = wfnBO["Umat"]
        Ccoeff = wfnBO["Ccoeff"]
        tmp=np.matmul(Umat,Ccoeff)
-       #set margin and step
-       margin = [4.5,4.5,4.5]
-       dstep =  [0.2,0.2,0.2] 
+       
        cube_util.orbtocube(psi4mol,margin,dstep,tmp,occlist,bset,tag="PsiA_occ",path="./")
        cube_util.orbtocube(psi4mol,margin,dstep,tmp,virtlist,bset,tag="PsiA_virt",path="./")
 
@@ -250,5 +264,5 @@ if __name__ == "__main__":
        import time
        rt_time = time.process_time()
        rt_mod_new.run_rt_iterations(iter_opts, field_opts, bset, bsetH, wfnBO, psi4mol, args.axis, args.select, args.selective_pert, args.local_basis,\
-               args.exciteA_only, args.numpy_mem, args.debug,pyembopt, args.use_cap)
+               args.exciteA_only, args.numpy_mem, args.debug,pyembopt, args.use_cap, cube_data)
        print('Total time of rt_module: %.3f seconds \n\n' % (time.process_time() - rt_time))

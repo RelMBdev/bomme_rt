@@ -14,6 +14,16 @@ import psi4
 import scipy.linalg
 import os 
 
+from dataclasses import dataclass
+
+@dataclass
+class cubeoption:
+    int_cdump : int 
+    margin: np.ndarray
+    Dx : np.ndarray
+    dump: bool = False
+
+
 #also specified in 'CUBIC_GRID_OVERAGE' 
 #spacing
 def cubedata(gobj,L = [7.0,7.0,7.0],D = [0.1,0.1,0.1]):
@@ -71,7 +81,7 @@ def phi_builder(mol,xs,ys,zs,ws,basis,target='DFT'):   # if target == 'CUBE' thi
   else:
     epsilon = psi4.core.get_global_option("DFT_BASIS_TOLERANCE")
   basis_extents = psi4.core.BasisExtents(basis,epsilon)
-  import pdb; pdb.set_trace();
+  #import pdb; pdb.set_trace();
 
   blockopoints = psi4.core.BlockOPoints(xs, ys, zs, ws,basis_extents)
   npoints = blockopoints.npoints()
