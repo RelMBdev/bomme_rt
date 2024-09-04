@@ -1,0 +1,14 @@
+time_int: 1300.0
+delta_t : 0.1
+calc_flag :1
+i_rest : 0
+F_max : 0.00002
+freq_carrier : 0.468
+sigma : 64.8
+t0 : 393.3
+imp_type :analytic
+r0 : 8.
+eta : 9.5
+cthresh : 10.
+qvec : 0.
+prop_id : empc 
