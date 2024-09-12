@@ -1,0 +1,45 @@
+
+Host: ubuntu
+
+Timers On : Fri Aug 30 11:07:05 2024
+Timers Off: Fri Aug 30 11:07:35 2024
+
+Wall Time:       29.82 seconds
+
+                                                       Time (seconds)
+Module                                       User      System        Wall        Calls
+HF: Form core H                     :      0.000u      0.000s      0.002w      1 calls
+HF: Form S/X                        :      0.000u      0.000s      0.000w      1 calls
+HF: Guess                           :      0.033u      0.000s      0.017w      1 calls
+SAD Guess                           :      0.033u      0.000s      0.015w      1 calls
+HF: Form G                          :      0.050u      0.000s      0.025w      8 calls
+JK: D                               :      0.000u      0.000s      0.000w      8 calls
+JK: USO2AO                          :      0.000u      0.000s      0.000w      8 calls
+JK: JK                              :      0.050u      0.000s      0.024w      8 calls
+Libint2ERI::Libint2ERI              :      0.000u      0.000s      0.003w      9 calls
+build_JK_matrices()                 :      0.000u      0.000s      0.008w      8 calls
+JK: AO2USO                          :      0.000u      0.000s      0.000w      8 calls
+HF: Form F                          :      0.000u      0.000s      0.000w      8 calls
+HF: Form D                          :      0.000u      0.000s      0.000w      8 calls
+HF: DIIS                            :      0.100u      0.017s      0.072w      7 calls
+HF: Form C                          :      0.000u      0.000s      0.002w      7 calls
+
+--------------------------------------------------------------------------------------
+HF: Form core H                     :      0.000u      0.000s      0.002w      1 calls
+HF: Form S/X                        :      0.000u      0.000s      0.000w      1 calls
+HF: Guess                           :      0.033u      0.000s      0.017w      1 calls
+| SAD Guess                         :      0.033u      0.000s      0.015w      1 calls
+HF: Form G                          :      0.050u      0.000s      0.025w      8 calls
+| JK: D                             :      0.000u      0.000s      0.000w      8 calls
+| JK: USO2AO                        :      0.000u      0.000s      0.000w      8 calls
+| JK: JK                            :      0.050u      0.000s      0.024w      8 calls
+| | Libint2ERI::Libint2ERI          :      0.000u      0.000s      0.002w      8 calls
+| | build_JK_matrices()             :      0.000u      0.000s      0.008w      8 calls
+| JK: AO2USO                        :      0.000u      0.000s      0.000w      8 calls
+HF: Form F                          :      0.000u      0.000s      0.000w      8 calls
+HF: Form D                          :      0.000u      0.000s      0.000w      8 calls
+HF: DIIS                            :      0.100u      0.017s      0.072w      7 calls
+HF: Form C                          :      0.000u      0.000s      0.002w      7 calls
+Libint2ERI::Libint2ERI              :      0.000u      0.000s      0.000w      1 calls
+
+**************************************************************************************
